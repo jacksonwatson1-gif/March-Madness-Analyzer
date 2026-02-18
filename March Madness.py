@@ -156,11 +156,14 @@ div[aria-selected="true"] {
 
 /* Global Header Styling for Tables */
 .stDataFrame th, .stTable th {
-    background-color: #0B1F3A !important;
-    color: #FFD166 !important;
-    font-weight: 600 !important;
+    background-color: #FFD166 !important; /* Gold Background */
+    color: #0B1F3A !important;            /* Navy Lettering */
+    font-weight: 700 !important;
     text-align: center !important;
-    border-bottom: 2px solid #FF6B35 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    border: 1px solid #FF6B35 !important; /* Orange border for definition */
 }
 
 /* Ensure Team names are visible and contrast well */
@@ -614,45 +617,34 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ── Bracket Visualization Helpers ─────────────────────────────────────────────
 def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> pd.DataFrame:
     """
-    Restores team name visibility and applies Navy & Gold header styling.
+    Applies Navy on Gold styling to headers and numeric heatmaps to columns.
     """
     display_df = df.copy()
 
-    # 1. Convert stats to numeric so the gradient math works
-    numeric_cols = ['AdjEM', 'AdjOE', 'AdjDE', 'Win%', 'NetRtg', 'KenPom']
+    # Ensure stats are numeric for gradients
+    numeric_cols = ['AdjEM', 'AdjOE', 'AdjDE', 'Win%', 'NetRtg', 'KenPom', 'ChampionshipProb']
     for col in numeric_cols:
         if col in display_df.columns:
             display_df[col] = pd.to_numeric(display_df[col], errors='coerce')
 
     styled = display_df.style
 
-    # 2. Add Background Gradients (Net Rating and Win%)
-    if 'NetRtg' in display_df.columns:
-        styled = styled.background_gradient(subset=['NetRtg'], cmap='RdYlGn', vmin=-15, vmax=25)
-    elif 'AdjEM' in display_df.columns:
-        styled = styled.background_gradient(subset=['AdjEM'], cmap='RdYlGn', vmin=-15, vmax=25)
-        
-    if 'Win%' in display_df.columns:
-        styled = styled.background_gradient(subset=['Win%'], cmap='RdYlGn', vmin=0.3, vmax=0.95)
-
-    # 3. Apply Navy & Gold Header Styling
-    # Gold writing (#FFD166) with Navy background (#0B1F3A)
+    # 1. Apply Navy Lettering on Gold Background for Headers
     styled = styled.set_table_styles([
         {'selector': 'th', 'props': [
-            ('background-color', '#0B1F3A'), 
-            ('color', '#FFD166'), 
+            ('background-color', '#FFD166'), 
+            ('color', '#0B1F3A'), 
             ('font-family', 'IBM Plex Mono, monospace'),
-            ('text-transform', 'uppercase'),
-            ('letter-spacing', '2px'),
-            ('border', '1px solid #FF6B35')
-        ]},
-        {'selector': 'td', 'props': [
-            ('text-align', 'center'),
-            ('font-family', 'IBM Plex Mono, monospace')
+            ('font-weight', '700'),
+            ('text-transform', 'uppercase')
         ]}
     ])
 
-    # 4. Apply numeric formatting while keeping names as text
+    # 2. Add Heatmap Gradients (Optional but recommended for AdjEM/Win%)
+    if 'AdjEM' in display_df.columns:
+        styled = styled.background_gradient(subset=['AdjEM'], cmap='RdYlGn', vmin=-10, vmax=25)
+    
+    # 3. Apply numeric formatting
     if fmt:
         styled = styled.format(fmt, na_rep="-")
         
