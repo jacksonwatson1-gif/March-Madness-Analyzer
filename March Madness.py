@@ -127,6 +127,32 @@ section[data-testid="stSidebar"] h2 {
     color: var(--orange);
     letter-spacing: 3px;
 }
+
+/* --- Custom Tab Styling --- */
+/* Target the overall Tab container */
+div[data-baseweb="tab-list"] {
+    background-color: var(--card); /* Uses your existing dark blue card color */
+    border-radius: 4px;
+    padding: 5px;
+    gap: 10px;
+}
+
+/* Style the default/unselected tabs */
+div[data-baseweb="tab"] {
+    color: var(--cream) !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.8rem !important;
+    letter-spacing: 1px;
+    border-radius: 4px;
+    padding: 8px 16px;
+}
+
+/* Style the active/selected tab to match your Navy & Gold theme */
+div[aria-selected="true"] {
+    background-color: var(--gold) !important;
+    color: var(--navy) !important;
+    font-weight: 600 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -548,22 +574,23 @@ def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> pd.Da
     Returns a styled DataFrame with background gradients. 
     Requires matplotlib in requirements.txt.
     """
-    # 1. Convert columns to numeric to ensure Styler can process them
-    for col in df.columns:
-        if col in ['AdjEM', 'AdjOE', 'AdjDE', 'KenPom', 'ChampionshipProb', 'Win Prob']:
-            df[col] = pd.to_numeric(df[col], errors='coerce') #
+    # 1. Ensure columns are numeric for the Styler
+    numeric_cols = ['AdjEM', 'AdjOE', 'AdjDE', 'KenPom', 'ChampionshipProb', 'Win Prob', 'Win%']
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
 
     styled = df.style #
     
-    # 2. Apply heat-map gradients
+    # 2. Apply heat-map gradients (Red-to-Green for efficiency and win %)
     if 'AdjEM' in df.columns:
-        styled = styled.background_gradient(subset=['AdjEM'], cmap='RdYlGn')
-    if 'AdjOE' in df.columns:
-        styled = styled.background_gradient(subset=['AdjOE'], cmap='Greens')
+        styled = styled.background_gradient(subset=['AdjEM'], cmap='RdYlGn', vmin=-10, vmax=30)
+    if 'Win Prob' in df.columns:
+        styled = styled.background_gradient(subset=['Win Prob'], cmap='RdYlGn', vmin=0, vmax=1)
     if 'ChampionshipProb' in df.columns:
         styled = styled.background_gradient(subset=['ChampionshipProb'], cmap='YlOrRd')
 
-    # 3. Apply numeric formatting
+    # 3. Apply the final numeric formatting
     if fmt:
         styled = styled.format(fmt)
         
