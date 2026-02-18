@@ -545,20 +545,29 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ── Bracket Visualization Helpers ─────────────────────────────────────────────
 def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> pd.DataFrame:
     """
-    Returns a plain formatted DataFrame with no matplotlib dependency.
-    bar_cols is accepted for call-site compatibility but ignored.
+    Returns a styled DataFrame with background gradients. 
+    Requires matplotlib in requirements.txt.
     """
-    display = df.copy()
+    # 1. Convert columns to numeric to ensure Styler can process them
+    for col in df.columns:
+        if col in ['AdjEM', 'AdjOE', 'AdjDE', 'KenPom', 'ChampionshipProb', 'Win Prob']:
+            df[col] = pd.to_numeric(df[col], errors='coerce') #
+
+    styled = df.style #
+    
+    # 2. Apply heat-map gradients
+    if 'AdjEM' in df.columns:
+        styled = styled.background_gradient(subset=['AdjEM'], cmap='RdYlGn')
+    if 'AdjOE' in df.columns:
+        styled = styled.background_gradient(subset=['AdjOE'], cmap='Greens')
+    if 'ChampionshipProb' in df.columns:
+        styled = styled.background_gradient(subset=['ChampionshipProb'], cmap='YlOrRd')
+
+    # 3. Apply numeric formatting
     if fmt:
-        for col, f in fmt.items():
-            if col in display.columns:
-                try:
-                    display[col] = display[col].apply(
-                        lambda v, _f=f: _f.format(v) if pd.notna(v) else ""
-                    )
-                except Exception:
-                    pass
-    return display
+        styled = styled.format(fmt)
+        
+    return styled
 
 
 def win_prob_color(prob: float) -> tuple:
