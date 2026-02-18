@@ -703,34 +703,31 @@ def region_bracket_html(region: str, matchups: list) -> str:
     </div>"""
 
 
-def color_legend_html() -> str:
+def render_color_legend():
+    """Render the win probability color legend using native Streamlit components."""
     entries = [
-        ("#06D6A0", "≥75%  Heavy Favorite"),
-        ("#4ade80", "55–74%  Moderate Favorite"),
-        ("#FFD166", "45–54%  Toss-Up"),
-        ("#f87171", "25–44%  Moderate Underdog"),
-        ("#EF476F", "<25%  Heavy Underdog"),
+        ("🟢", "#06D6A0", "≥ 75%",   "Heavy Favorite"),
+        ("🟩", "#4ade80", "55 – 74%", "Moderate Favorite"),
+        ("🟡", "#FFD166", "45 – 54%", "Toss-Up"),
+        ("🟥", "#f87171", "25 – 44%", "Moderate Underdog"),
+        ("🔴", "#EF476F", "< 25%",    "Heavy Underdog"),
     ]
-    items = "".join(f"""
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
-            <div style="width:12px;height:12px;border-radius:2px;
-                        background:{c};flex-shrink:0;"></div>
-            <span style="font-size:0.68rem;color:#ccc;
-                         font-family:'IBM Plex Mono',monospace;">{label}</span>
-        </div>""" for c, label in entries)
-    return f"""
-    <div style="background:#0a1628;border:1px solid #1e3a5f;border-radius:4px;
-                padding:12px;margin-bottom:16px;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
-                    color:#FF6B35;letter-spacing:2px;margin-bottom:8px;">
-            WIN PROBABILITY COLOR KEY
-        </div>
-        {items}
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e3a5f;
-                    font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#666;">
-            ✓ ADV = Advanced · ✗ ELIM = Eliminated · Colors update live
-        </div>
-    </div>"""
+    st.markdown("**WIN PROBABILITY COLOR KEY**")
+    cols = st.columns(5)
+    for col, (icon, color, pct, label) in zip(cols, entries):
+        with col:
+            st.markdown(
+                f"<div style='background:{color}22;border-left:4px solid {color};"
+                f"border-radius:3px;padding:8px 10px;text-align:center;'>"
+                f"<div style='font-size:1.2rem;'>{icon}</div>"
+                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.7rem;"
+                f"color:{color};font-weight:700;'>{pct}</div>"
+                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.62rem;"
+                f"color:#aaa;margin-top:2px;'>{label}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+    st.caption("✓ ADV = Advanced after game played · ✗ ELIM = Eliminated · Reset button clears all results")
 
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
@@ -802,7 +799,7 @@ with tab2:
 
     bracket_state = st.session_state.bracket_state
 
-    st.markdown(color_legend_html(), unsafe_allow_html=True)
+    render_color_legend()
 
     reg_tabs = st.tabs([f"🏀 {r}" for r in REGIONS])
 
