@@ -167,6 +167,35 @@ div[aria-selected="true"] {
 .stDataFrame td {
     color: #F5F0E8 !important; /* Your 'Cream' variable */
 }
+
+/* --- Enhanced Gold Tab Styling --- */
+
+/* 1. Make all tab labels clearly visible gold by default */
+button[data-baseweb="tab"] div p {
+    color: #FFD166 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 600 !important;
+    letter-spacing: 1px !important;
+    transition: all 0.3s ease !important;
+}
+
+/* 2. Shining gold effect on hover */
+button[data-baseweb="tab"]:hover div p {
+    color: #FFFFFF !important; /* Brighter white-gold shine */
+    text-shadow: 0 0 10px rgba(255, 209, 102, 0.8) !important;
+    cursor: pointer !important;
+}
+
+/* 3. Style the active/selected tab */
+button[aria-selected="true"] div p {
+    color: #FF6B35 !important; /* Highlight active tab in your theme's orange */
+    border-bottom: 2px solid #FF6B35 !important;
+}
+
+/* 4. Remove the default grey background on hover */
+button[data-baseweb="tab"]:hover {
+    background-color: rgba(255, 209, 102, 0.1) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
