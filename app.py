@@ -543,36 +543,22 @@ for col, (val, label) in zip([k1,k2,k3,k4,k5], [
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Bracket Visualization Helpers ─────────────────────────────────────────────
-def style_numeric_col(df_styler, col: str, color_low: str, color_high: str,
-                      reverse: bool = False):
+def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> pd.DataFrame:
     """
-    Apply a bar-based color gradient to a dataframe column without matplotlib.
-    Uses pandas Styler.bar() which only needs pandas — no matplotlib dependency.
+    Returns a plain formatted DataFrame with no matplotlib dependency.
+    bar_cols is accepted for call-site compatibility but ignored.
     """
-    color = color_high if not reverse else color_low
-    try:
-        return df_styler.bar(subset=[col], color=color, vmin=None, vmax=None)
-    except Exception:
-        return df_styler
-
-
-def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> object:
-    """
-    Safe styler: applies format + optional bar highlights.
-    bar_cols: list of (col, color) tuples.
-    No matplotlib required.
-    """
-    s = df.style
+    display = df.copy()
     if fmt:
-        s = s.format(fmt)
-    if bar_cols:
-        for col, color in bar_cols:
-            if col in df.columns:
+        for col, f in fmt.items():
+            if col in display.columns:
                 try:
-                    s = s.bar(subset=[col], color=color)
+                    display[col] = display[col].apply(
+                        lambda v, _f=f: _f.format(v) if pd.notna(v) else ""
+                    )
                 except Exception:
                     pass
-    return s
+    return display
 
 
 def win_prob_color(prob: float) -> tuple:
