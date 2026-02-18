@@ -543,6 +543,38 @@ for col, (val, label) in zip([k1,k2,k3,k4,k5], [
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ── Bracket Visualization Helpers ─────────────────────────────────────────────
+def style_numeric_col(df_styler, col: str, color_low: str, color_high: str,
+                      reverse: bool = False):
+    """
+    Apply a bar-based color gradient to a dataframe column without matplotlib.
+    Uses pandas Styler.bar() which only needs pandas — no matplotlib dependency.
+    """
+    color = color_high if not reverse else color_low
+    try:
+        return df_styler.bar(subset=[col], color=color, vmin=None, vmax=None)
+    except Exception:
+        return df_styler
+
+
+def style_df(df: pd.DataFrame, fmt: dict = None, bar_cols: list = None) -> object:
+    """
+    Safe styler: applies format + optional bar highlights.
+    bar_cols: list of (col, color) tuples.
+    No matplotlib required.
+    """
+    s = df.style
+    if fmt:
+        s = s.format(fmt)
+    if bar_cols:
+        for col, color in bar_cols:
+            if col in df.columns:
+                try:
+                    s = s.bar(subset=[col], color=color)
+                except Exception:
+                    pass
+    return s
+
+
 def win_prob_color(prob: float) -> tuple:
     """
     Map a win probability (0–1) to a background color and text color.
@@ -758,16 +790,15 @@ with tab1:
         if "AdjEM"     in avail_cols: fmt["AdjEM"]     = "{:+.1f}"
         if "Continuity" in avail_cols: fmt["Continuity"] = "{:.1f}%"
 
-        styled = df_filtered[avail_cols].style
-        if "KenPom" in avail_cols:
-            styled = styled.background_gradient(subset=["KenPom"], cmap="YlOrRd")
-        if "AdjEM" in avail_cols:
-            styled = styled.background_gradient(subset=["AdjEM"], cmap="RdYlGn")
-        if "AdjOE" in avail_cols:
-            styled = styled.background_gradient(subset=["AdjOE"], cmap="Greens")
-        if "AdjDE" in avail_cols:
-            styled = styled.background_gradient(subset=["AdjDE"], cmap="RdYlGn_r")
-        styled = styled.format(fmt)
+        styled = style_df(
+            df_filtered[avail_cols], fmt=fmt,
+            bar_cols=[
+                ("KenPom", "#FF6B35"),
+                ("AdjEM",  "#06D6A0"),
+                ("AdjOE",  "#4ade80"),
+                ("AdjDE",  "#EF476F"),
+            ]
+        )
         st.dataframe(styled, use_container_width=True, height=520)
 
     with col_b:
@@ -972,10 +1003,10 @@ with tab2:
     df_probs = pd.DataFrame(prob_rows)
     if not df_probs.empty:
         st.dataframe(
-            df_probs.style
-                .background_gradient(subset=["Fav Win%"], cmap="Greens")
-                .background_gradient(subset=["Dog Win%"], cmap="Reds")
-                .format({"Fav Win%": "{:.1%}", "Dog Win%": "{:.1%}"}),
+            style_df(df_probs,
+                fmt={"Fav Win%": "{:.1%}", "Dog Win%": "{:.1%}"},
+                bar_cols=[("Fav Win%","#06D6A0"),("Dog Win%","#EF476F")]
+            ),
             use_container_width=True, height=420,
         )
 
@@ -1260,9 +1291,10 @@ with tab3:
         if pick_summary:
             df_picks = pd.DataFrame(pick_summary).sort_values("Region")
             st.dataframe(
-                df_picks.style
-                    .background_gradient(subset=["Win Prob"], cmap="RdYlGn")
-                    .format({"Win Prob": "{:.1%}"}),
+                style_df(df_picks,
+                    fmt={"Win Prob": "{:.1%}"},
+                    bar_cols=[("Win Prob","#06D6A0")]
+                ),
                 use_container_width=True,
                 hide_index=True,
             )
@@ -1295,9 +1327,10 @@ with tab4:
                    [["Seed","Team","Region","AdjOE","Tempo"]]
                    .reset_index(drop=True))
         st.dataframe(
-            top_off.style
-                .background_gradient(subset=["AdjOE"], cmap="Greens")
-                .format({"AdjOE": "{:.1f}", "Tempo": "{:.1f}"}),
+            style_df(top_off,
+                fmt={"AdjOE": "{:.1f}", "Tempo": "{:.1f}"},
+                bar_cols=[("AdjOE","#06D6A0")]
+            ),
             use_container_width=True, height=420
         )
 
@@ -1307,9 +1340,10 @@ with tab4:
                    [["Seed","Team","Region","AdjDE","Tempo"]]
                    .reset_index(drop=True))
         st.dataframe(
-            top_def.style
-                .background_gradient(subset=["AdjDE"], cmap="RdYlGn_r")
-                .format({"AdjDE": "{:.1f}", "Tempo": "{:.1f}"}),
+            style_df(top_def,
+                fmt={"AdjDE": "{:.1f}", "Tempo": "{:.1f}"},
+                bar_cols=[("AdjDE","#EF476F")]
+            ),
             use_container_width=True, height=420
         )
 
@@ -1328,9 +1362,10 @@ with tab4:
                         [["Seed","Team","Continuity","AdjEM"]]
                         .reset_index(drop=True))
         st.dataframe(
-            cont_leaders.style
-                .background_gradient(subset=["Continuity"], cmap="Blues")
-                .format({"Continuity": "{:.1f}%", "AdjEM": "{:+.1f}"}),
+            style_df(cont_leaders,
+                fmt={"Continuity": "{:.1f}%", "AdjEM": "{:+.1f}"},
+                bar_cols=[("Continuity","#60a5fa")]
+            ),
             use_container_width=True, height=360
         )
 
@@ -1364,10 +1399,11 @@ with tab4:
                  [["Seed","Team","Region","AdjOE","AdjDE","AdjEM","Continuity"]]
                  .head(16).reset_index(drop=True))
         st.dataframe(
-            elite.style
-                .background_gradient(subset=["AdjEM"], cmap="YlOrRd")
-                .format({"AdjOE": "{:.1f}", "AdjDE": "{:.1f}",
-                         "AdjEM": "{:+.1f}", "Continuity": "{:.1f}%"}),
+            style_df(elite,
+                fmt={"AdjOE": "{:.1f}", "AdjDE": "{:.1f}",
+                     "AdjEM": "{:+.1f}", "Continuity": "{:.1f}%"},
+                bar_cols=[("AdjEM","#FFD166")]
+            ),
             use_container_width=True
         )
 
@@ -1508,10 +1544,11 @@ with tab6:
 
     st.markdown("#### Round-by-Round Win Rates")
     st.dataframe(
-        df_history[["Seed","R32_Rate","Sweet16_Rate","FF_Appearances","Championships"]]
-            .style
-            .background_gradient(subset=["R32_Rate","Sweet16_Rate"], cmap="YlOrRd")
-            .format({"R32_Rate": "{:.1%}", "Sweet16_Rate": "{:.1%}"}),
+        style_df(
+            df_history[["Seed","R32_Rate","Sweet16_Rate","FF_Appearances","Championships"]],
+            fmt={"R32_Rate": "{:.1%}", "Sweet16_Rate": "{:.1%}"},
+            bar_cols=[("R32_Rate","#FF6B35"),("Sweet16_Rate","#FFD166")]
+        ),
         use_container_width=True,
     )
 
@@ -1550,12 +1587,13 @@ with tab7:
         if "AdjDE"      in sim_cols: fmt_sim["AdjDE"]      = "{:.1f}"
 
         top20 = df_sim.head(20)[sim_cols]
-        styled_sim = top20.style.background_gradient(subset=["ChampionshipProb"], cmap="YlOrRd")
-        if "AdjOE" in sim_cols:
-            styled_sim = styled_sim.background_gradient(subset=["AdjOE"], cmap="Greens")
-        if "AdjDE" in sim_cols:
-            styled_sim = styled_sim.background_gradient(subset=["AdjDE"], cmap="RdYlGn_r")
-        styled_sim = styled_sim.format(fmt_sim)
+        styled_sim = style_df(top20, fmt=fmt_sim,
+            bar_cols=[
+                ("ChampionshipProb", "#FFD166"),
+                ("AdjOE",            "#06D6A0"),
+                ("AdjDE",            "#EF476F"),
+            ]
+        )
         st.dataframe(styled_sim, use_container_width=True)
 
         col_s1, col_s2 = st.columns(2)
