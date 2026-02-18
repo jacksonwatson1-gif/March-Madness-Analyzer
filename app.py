@@ -731,9 +731,10 @@ def render_color_legend():
 
 
 # ── Tabs ───────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 BRACKET FIELD",
     "🗂 LIVE BRACKET",
+    "🏆 BRACKET PICKER",
     "⚡ EFFICIENCY",
     "🎯 UPSET ANALYZER",
     "📈 SEED HISTORY",
@@ -784,24 +785,63 @@ with tab1:
 
 # ─── Tab 2: Live Bracket ──────────────────────────────────────────────────────
 with tab2:
-    st.markdown("### LIVE BRACKET — WIN PROBABILITY VIEW")
-    st.markdown(
-        "Each team slot is color-coded by projected win probability. "
-        "**Green** = heavy favorite · **Red** = heavy underdog. "
-        "Mark winners using the controls below to track results in real time."
-    )
+
+    # ── March Madness Header Banner ──
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0d1f3c 0%,#1a3a6b 60%,#0d2a4a 100%);
+                border:2px solid #FF6B35;border-radius:10px;padding:22px 30px;
+                text-align:center;margin-bottom:18px;position:relative;
+                box-shadow:0 4px 24px #FF6B3544;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:3rem;
+                    color:#FF6B35;letter-spacing:8px;line-height:1.05;
+                    text-shadow:0 2px 12px #FF6B3588;">
+            MARCH MADNESS
+        </div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;
+                    color:#FFD166;letter-spacing:5px;margin-top:2px;">
+            LIVE BRACKET TRACKER
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;
+                    color:#aaa;letter-spacing:3px;margin-top:8px;text-transform:uppercase;">
+            2025 NCAA Division I Men's Basketball Tournament
+        </div>
+        <div style="display:flex;justify-content:center;gap:24px;margin-top:12px;
+                    flex-wrap:wrap;">
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                          color:#06D6A0;border:1px solid #06D6A0;padding:3px 10px;
+                          border-radius:3px;letter-spacing:2px;">R1: MAR 20-21</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                          color:#FFD166;border:1px solid #FFD166;padding:3px 10px;
+                          border-radius:3px;letter-spacing:2px;">R2: MAR 22-23</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                          color:#FF6B35;border:1px solid #FF6B35;padding:3px 10px;
+                          border-radius:3px;letter-spacing:2px;">S16: MAR 27-28</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                          color:#EF476F;border:1px solid #EF476F;padding:3px 10px;
+                          border-radius:3px;letter-spacing:2px;">E8: MAR 29-30</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                          color:#c084fc;border:1px solid #c084fc;padding:3px 10px;
+                          border-radius:3px;letter-spacing:2px;">F4 + CHAMP: APR 5/7</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if "bracket_state" not in st.session_state:
         st.session_state.bracket_state = build_bracket_state(df_bracket)
 
-    if st.button("🔄 Reset Bracket to Pre-Tournament", key="reset_bracket"):
-        st.session_state.bracket_state = build_bracket_state(df_bracket)
+    ctrl_col1, ctrl_col2 = st.columns([1, 4])
+    with ctrl_col1:
+        if st.button("🔄 Reset All Results", key="reset_bracket",
+                     use_container_width=True):
+            st.session_state.bracket_state = build_bracket_state(df_bracket)
+
+    with ctrl_col2:
+        render_color_legend()
 
     bracket_state = st.session_state.bracket_state
 
-    render_color_legend()
-
-    reg_tabs = st.tabs([f"🏀 {r}" for r in REGIONS])
+    # ── Styled region tabs ──
+    reg_tabs = st.tabs([f"◈ {r.upper()}" for r in REGIONS])
 
     for reg_tab, region in zip(reg_tabs, REGIONS):
         with reg_tab:
@@ -810,63 +850,111 @@ with tab2:
                 st.warning(f"No matchup data for {region}.")
                 continue
 
-            st.markdown(f"#### {region.upper()} REGION — ROUND OF 64")
-            st.markdown("Select the winner of each game to update the bracket:")
+            # Region sub-header
+            st.markdown(f"""
+            <div style="background:linear-gradient(90deg,#FF6B3522,transparent);
+                        border-left:4px solid #FF6B35;padding:10px 16px;
+                        margin-bottom:16px;border-radius:0 4px 4px 0;">
+                <span style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;
+                             color:#FF6B35;letter-spacing:4px;">{region.upper()} REGION</span>
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;
+                             color:#aaa;margin-left:12px;letter-spacing:2px;">ROUND OF 64</span>
+            </div>""", unsafe_allow_html=True)
 
-            for i, m in enumerate(matchups):
-                fav_name = str(m["fav"].get("Team", "Team A"))
-                dog_name = str(m["dog"].get("Team", "Team B"))
-                fav_seed = int(m["fav"].get("Seed", 0))
-                dog_seed = int(m["dog"].get("Seed", 0))
+            # Two-column layout: controls left, visual cards right
+            left_col, right_col = st.columns([1, 1])
 
-                col_ctrl, col_disp = st.columns([1, 2])
-                with col_ctrl:
-                    current   = m.get("winner")
-                    options   = ["Not Played", fav_name, dog_name]
-                    def_idx   = 0
+            with left_col:
+                st.markdown("""
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;
+                            color:#FFD166;letter-spacing:2px;margin-bottom:10px;">
+                    ▶ SELECT GAME WINNERS
+                </div>""", unsafe_allow_html=True)
+
+                for i, m in enumerate(matchups):
+                    fav_name = str(m["fav"].get("Team","Team A"))
+                    dog_name = str(m["dog"].get("Team","Team B"))
+                    fav_seed = int(m["fav"].get("Seed",0))
+                    dog_seed = int(m["dog"].get("Seed",0))
+                    current  = m.get("winner")
+                    options  = ["— Not Played —", fav_name, dog_name]
+                    def_idx  = 0
                     if current == fav_name: def_idx = 1
                     elif current == dog_name: def_idx = 2
 
+                    st.markdown(f"""
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                                color:#888;letter-spacing:1px;margin-top:8px;">
+                        GAME {i+1} · ({fav_seed}) vs ({dog_seed})
+                    </div>""", unsafe_allow_html=True)
+
                     choice = st.selectbox(
-                        f"Game {i+1}: ({fav_seed}) vs ({dog_seed})",
-                        options, index=def_idx,
-                        key=f"w_{region}_{i}"
+                        f"G{i+1}", options, index=def_idx,
+                        key=f"w_{region}_{i}", label_visibility="collapsed"
                     )
                     bracket_state[region][i]["winner"] = (
-                        None if choice == "Not Played" else choice
+                        None if "Not Played" in choice else choice
                     )
 
-                with col_disp:
-                    st.markdown(
-                        matchup_html(bracket_state[region][i]),
-                        unsafe_allow_html=True
-                    )
+            with right_col:
+                st.markdown("""
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;
+                            color:#FFD166;letter-spacing:2px;margin-bottom:10px;">
+                    ◈ MATCHUP PROBABILITY CARDS
+                </div>""", unsafe_allow_html=True)
+                for m in bracket_state[region]:
+                    st.markdown(matchup_html(m), unsafe_allow_html=True)
 
+            # Full region visual bracket card
             st.markdown("---")
-            st.markdown(f"##### {region} — Full Visual Card")
-            st.markdown(f"""
-            <div style="background:#071429;border:1px solid #1e3a5f;
-                        border-radius:6px;padding:16px;">
-                {region_bracket_html(region, bracket_state[region])}
-            </div>""", unsafe_allow_html=True)
+            adv_count = sum(1 for m in bracket_state[region] if m.get("winner"))
+            upsets    = sum(1 for m in bracket_state[region]
+                           if m.get("winner") and
+                           m.get("winner") == str(m["dog"].get("Team","")))
+            kc1, kc2, kc3 = st.columns(3)
+            for col, (val, label) in zip([kc1,kc2,kc3], [
+                (f"{adv_count}/8",  "Games Played"),
+                (f"{8-adv_count}",  "Games Remaining"),
+                (f"{upsets}",       "Upsets So Far"),
+            ]):
+                with col:
+                    st.markdown(f"""
+                    <div class='metric-card' style='padding:8px;'>
+                        <div class='metric-value' style='font-size:1.6rem;'>{val}</div>
+                        <div class='metric-label'>{label}</div>
+                    </div>""", unsafe_allow_html=True)
 
+    # ── Full 4-region bracket visual ──
     st.markdown("---")
-    st.markdown("### FULL BRACKET — ALL 4 REGIONS")
+    st.markdown("""
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;
+                color:#FFD166;letter-spacing:5px;margin-bottom:12px;">
+        ◈ COMPLETE BRACKET — ALL REGIONS
+    </div>""", unsafe_allow_html=True)
+
     all_html = "".join(
-        region_bracket_html(r, bracket_state.get(r, [])) for r in REGIONS
+        region_bracket_html(r, bracket_state.get(r,[])) for r in REGIONS
     )
     st.markdown(f"""
-    <div style="display:flex;gap:12px;flex-wrap:wrap;background:#071429;
-                border:1px solid #FF6B35;border-radius:6px;
-                padding:16px;overflow-x:auto;">
+    <div style="display:flex;gap:14px;flex-wrap:wrap;
+                background:linear-gradient(135deg,#071429,#0d1f3c);
+                border:2px solid #FF6B35;border-radius:8px;
+                padding:20px;overflow-x:auto;
+                box-shadow:0 4px 24px #00000055;">
         {all_html}
     </div>""", unsafe_allow_html=True)
 
+    # ── Probability summary table ──
     st.markdown("---")
-    st.markdown("### WIN PROBABILITY SUMMARY TABLE")
+    st.markdown("""
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.4rem;
+                color:#FF6B35;letter-spacing:4px;margin-bottom:10px;">
+        WIN PROBABILITY SUMMARY
+    </div>""", unsafe_allow_html=True)
+
     prob_rows = []
     for region in REGIONS:
-        for m in bracket_state.get(region, []):
+        for m in bracket_state.get(region,[]):
             fav = m["fav"]; dog = m["dog"]
             prob_rows.append({
                 "Region":   region,
@@ -876,7 +964,7 @@ with tab2:
                 "Underdog": dog.get("Team",""),
                 "Dog Win%": m["dog_prob"],
                 "Result":   m.get("winner") or "—",
-                "Upset?":   "✓" if (
+                "Upset?":   "✓ UPSET" if (
                     m.get("winner") and
                     m.get("winner") == dog.get("Team","")
                 ) else "—",
@@ -888,12 +976,314 @@ with tab2:
                 .background_gradient(subset=["Fav Win%"], cmap="Greens")
                 .background_gradient(subset=["Dog Win%"], cmap="Reds")
                 .format({"Fav Win%": "{:.1%}", "Dog Win%": "{:.1%}"}),
-            use_container_width=True, height=400,
+            use_container_width=True, height=420,
         )
 
 
-# ─── Tab 3: Efficiency Dashboard ──────────────────────────────────────────────
+# ─── Tab 3: Bracket Picker ────────────────────────────────────────────────────
 with tab3:
+
+    # ── Header ──
+    st.markdown("""
+    <div style="background:linear-gradient(135deg,#0d1f3c 0%,#1a3a6b 60%,#0d2a4a 100%);
+                border:2px solid #FFD166;border-radius:10px;padding:22px 30px;
+                text-align:center;margin-bottom:20px;
+                box-shadow:0 4px 24px #FFD16633;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.8rem;
+                    color:#FFD166;letter-spacing:8px;line-height:1.05;">
+            BRACKET PICKER
+        </div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.72rem;
+                    color:#aaa;letter-spacing:3px;margin-top:6px;">
+            BUILD · SAVE · COMPARE MULTIPLE BRACKETS
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Multi-bracket management ──
+    if "saved_brackets" not in st.session_state:
+        st.session_state.saved_brackets = {}   # name → picks dict
+    if "active_picker" not in st.session_state:
+        st.session_state.active_picker = {}    # current working picks
+
+    mgmt_col1, mgmt_col2, mgmt_col3, mgmt_col4 = st.columns([2,1,1,1])
+
+    with mgmt_col1:
+        bracket_name = st.text_input(
+            "Bracket Name", value="My Bracket",
+            placeholder="Enter a name for this bracket...",
+            key="bracket_name_input"
+        )
+
+    with mgmt_col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("💾 Save Bracket", use_container_width=True):
+            if bracket_name.strip():
+                st.session_state.saved_brackets[bracket_name.strip()] = \
+                    dict(st.session_state.active_picker)
+                st.success(f"Saved: {bracket_name.strip()}")
+
+    with mgmt_col3:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🗑 Clear Picks", use_container_width=True):
+            st.session_state.active_picker = {}
+            st.rerun()
+
+    with mgmt_col4:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.session_state.saved_brackets:
+            load_name = st.selectbox(
+                "Load Bracket",
+                ["— Select —"] + list(st.session_state.saved_brackets.keys()),
+                key="load_bracket_select",
+                label_visibility="collapsed"
+            )
+            if load_name != "— Select —":
+                st.session_state.active_picker = \
+                    dict(st.session_state.saved_brackets[load_name])
+
+    # ── Saved brackets summary ──
+    if st.session_state.saved_brackets:
+        st.markdown("---")
+        st.markdown("""
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;
+                    color:#FF6B35;letter-spacing:3px;margin-bottom:8px;">
+            SAVED BRACKETS
+        </div>""", unsafe_allow_html=True)
+
+        sb_cols = st.columns(min(len(st.session_state.saved_brackets), 4))
+        for col, (bname, bpicks) in zip(
+            sb_cols, st.session_state.saved_brackets.items()
+        ):
+            total_picks = len(bpicks)
+            with col:
+                st.markdown(f"""
+                <div style="background:#0F2847;border:1px solid #FFD166;
+                            border-radius:4px;padding:10px;text-align:center;">
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.7rem;
+                                color:#FFD166;font-weight:700;white-space:nowrap;
+                                overflow:hidden;text-overflow:ellipsis;">{bname}</div>
+                    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.6rem;
+                                color:#FF6B35;">{total_picks}</div>
+                    <div style="font-family:'IBM Plex Mono',monospace;font-size:0.6rem;
+                                color:#aaa;">GAMES PICKED</div>
+                </div>""", unsafe_allow_html=True)
+
+        # Delete a bracket
+        del_name = st.selectbox(
+            "Delete a saved bracket:",
+            ["— Select to delete —"] + list(st.session_state.saved_brackets.keys()),
+            key="del_bracket"
+        )
+        if del_name != "— Select to delete —":
+            if st.button(f"🗑 Delete '{del_name}'", key="confirm_delete"):
+                del st.session_state.saved_brackets[del_name]
+                st.rerun()
+
+    st.markdown("---")
+
+    # ── Visual bracket picker — region by region ──
+    # Build seed lookup from bracket data
+    def get_region_seeds(region: str) -> dict:
+        reg_df = df_bracket[df_bracket["Region"] == region].sort_values("Seed")
+        return {int(row["Seed"]): row for _, row in reg_df.iterrows()}
+
+    ROUND_PAIRS = [(1,16),(8,9),(5,12),(4,13),(6,11),(3,14),(7,10),(2,15)]
+
+    def picker_slot_html(seed: int, name: str, prob: float,
+                         picked: bool, eliminated: bool) -> str:
+        bg, fg, _ = win_prob_color(prob)
+        if picked:
+            bg = "#0a3d1f"; fg = "#06D6A0"; border = "2px solid #06D6A0"
+        elif eliminated:
+            bg = "#111"; fg = "#444"; border = "1px solid #333"
+        else:
+            border = f"1px solid {fg}"
+
+        short_name = name[:18] + "…" if len(name) > 18 else name
+        pct = f"{prob*100:.0f}%"
+        return f"""<div style="background:{bg};border:{border};border-radius:3px;
+            padding:5px 8px;margin:1px 0;display:flex;align-items:center;
+            justify-content:space-between;min-height:34px;cursor:pointer;
+            font-family:'IBM Plex Mono',monospace;transition:all 0.15s;">
+            <div style="display:flex;align-items:center;gap:5px;">
+                <span style="color:{fg};font-size:0.62rem;font-weight:700;
+                             min-width:16px;">{seed}</span>
+                <span style="color:{'#06D6A0' if picked else ('#555' if eliminated else '#ddd')};
+                             font-size:0.68rem;" title="{name}">{short_name}</span>
+            </div>
+            <span style="color:{fg};font-size:0.6rem;font-weight:700;
+                         background:{fg}22;padding:1px 5px;border-radius:2px;">{pct}</span>
+        </div>"""
+
+    def render_picker_region(region: str, seeded: dict):
+        """Render one region's bracket picker with clickable team slots."""
+        st.markdown(f"""
+        <div style="background:linear-gradient(90deg,#FFD16622,transparent);
+                    border-left:4px solid #FFD166;padding:8px 14px;
+                    margin-bottom:12px;border-radius:0 4px 4px 0;">
+            <span style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;
+                         color:#FFD166;letter-spacing:4px;">{region.upper()}</span>
+        </div>""", unsafe_allow_html=True)
+
+        for pair_idx, (s1, s2) in enumerate(ROUND_PAIRS):
+            if s1 not in seeded or s2 not in seeded:
+                continue
+            t1 = seeded[s1]; t2 = seeded[s2]
+
+            # Compute probs
+            up = upset_probability(
+                t1["Seed"], t2["Seed"],
+                t1["KenPom"], t2["KenPom"],
+                t1.get("SOS",0.55), t2.get("SOS",0.55),
+                t1.get("Continuity",70), t2.get("Continuity",70),
+                t1.get("AdjOE",105), t2.get("AdjOE",105),
+                t1.get("AdjDE",100), t2.get("AdjDE",100),
+            )
+
+            game_key  = f"{region}_R1_G{pair_idx}"
+            picked    = st.session_state.active_picker.get(game_key)
+            t1_name   = str(t1.get("Team",""))
+            t2_name   = str(t2.get("Team",""))
+
+            t1_picked = picked == t1_name
+            t2_picked = picked == t2_name
+            t1_elim   = t2_picked
+            t2_elim   = t1_picked
+
+            st.markdown(f"""
+            <div style="background:#0a1628;border:1px solid #1e3a5f;
+                        border-radius:4px;padding:5px;margin-bottom:6px;">
+                <div style="font-family:'IBM Plex Mono',monospace;font-size:0.55rem;
+                            color:#555;letter-spacing:1px;padding:2px 4px;">
+                    GAME {pair_idx+1} · {region[:1].upper()} REGION
+                </div>
+                {picker_slot_html(s1,t1_name,up['fav_prob'],t1_picked,t1_elim)}
+                <div style="height:1px;background:#1e3a5f;margin:2px 0;"></div>
+                {picker_slot_html(s2,t2_name,up['upset_prob'],t2_picked,t2_elim)}
+            </div>""", unsafe_allow_html=True)
+
+            # Picker controls
+            pick_col1, pick_col2 = st.columns(2)
+            with pick_col1:
+                if st.button(
+                    f"✓ ({s1}) {t1_name[:14]}",
+                    key=f"pick_{region}_{pair_idx}_t1",
+                    use_container_width=True,
+                    type="primary" if t1_picked else "secondary"
+                ):
+                    st.session_state.active_picker[game_key] = t1_name
+                    st.rerun()
+            with pick_col2:
+                if st.button(
+                    f"✓ ({s2}) {t2_name[:14]}",
+                    key=f"pick_{region}_{pair_idx}_t2",
+                    use_container_width=True,
+                    type="primary" if t2_picked else "secondary"
+                ):
+                    st.session_state.active_picker[game_key] = t2_name
+                    st.rerun()
+
+    # ── Render all 4 regions in a 2x2 grid ──
+    st.markdown("""
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;
+                color:#FF6B35;letter-spacing:4px;margin-bottom:12px;">
+        ◈ ROUND OF 64 — PICK YOUR WINNERS
+    </div>""", unsafe_allow_html=True)
+
+    # Progress indicator
+    total_r1_games = len(ROUND_PAIRS) * 4
+    picked_count   = len(st.session_state.active_picker)
+    progress_pct   = picked_count / total_r1_games if total_r1_games > 0 else 0
+    st.progress(progress_pct,
+                text=f"Round of 64 Progress: {picked_count}/{total_r1_games} games picked")
+
+    # Region columns — left pair and right pair like a real bracket
+    left_regions  = [REGIONS[0], REGIONS[2]]  # East, South
+    right_regions = [REGIONS[1], REGIONS[3]]  # West, Midwest
+
+    picker_left, picker_divider, picker_right = st.columns([5, 0.3, 5])
+
+    with picker_left:
+        for region in left_regions:
+            seeded = get_region_seeds(region)
+            render_picker_region(region, seeded)
+
+    with picker_divider:
+        st.markdown("""
+        <div style="width:2px;background:linear-gradient(to bottom,
+              transparent,#FF6B35,#FFD166,#FF6B35,transparent);
+              min-height:600px;margin:auto;"></div>""",
+        unsafe_allow_html=True)
+
+    with picker_right:
+        for region in right_regions:
+            seeded = get_region_seeds(region)
+            render_picker_region(region, seeded)
+
+    # ── Picked winners summary ──
+    if st.session_state.active_picker:
+        st.markdown("---")
+        st.markdown("""
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:1.3rem;
+                    color:#06D6A0;letter-spacing:4px;margin-bottom:10px;">
+            YOUR ROUND OF 64 PICKS
+        </div>""", unsafe_allow_html=True)
+
+        pick_summary = []
+        for game_key, winner_name in st.session_state.active_picker.items():
+            parts  = game_key.split("_")
+            region = parts[0]
+            g_idx  = int(parts[-1].replace("G",""))
+            s1, s2 = ROUND_PAIRS[g_idx]
+            seeded = get_region_seeds(region)
+            if s1 in seeded and s2 in seeded:
+                t1 = seeded[s1]; t2 = seeded[s2]
+                is_upset = winner_name == str(t2.get("Team",""))
+                up = upset_probability(
+                    t1["Seed"], t2["Seed"],
+                    t1["KenPom"], t2["KenPom"],
+                    t1.get("SOS",0.55), t2.get("SOS",0.55),
+                    t1.get("Continuity",70), t2.get("Continuity",70),
+                    t1.get("AdjOE",105), t2.get("AdjOE",105),
+                    t1.get("AdjDE",100), t2.get("AdjDE",100),
+                )
+                win_prob = up["upset_prob"] if is_upset else up["fav_prob"]
+                pick_summary.append({
+                    "Region":   region,
+                    "Matchup":  f"({s1}) vs ({s2})",
+                    "Your Pick": winner_name,
+                    "Win Prob": win_prob,
+                    "Upset Pick?": "🔥 YES" if is_upset else "—",
+                })
+
+        if pick_summary:
+            df_picks = pd.DataFrame(pick_summary).sort_values("Region")
+            st.dataframe(
+                df_picks.style
+                    .background_gradient(subset=["Win Prob"], cmap="RdYlGn")
+                    .format({"Win Prob": "{:.1%}"}),
+                use_container_width=True,
+                hide_index=True,
+            )
+            upset_picks = sum(1 for p in pick_summary if "YES" in p["Upset Pick?"])
+            avg_prob    = sum(p["Win Prob"] for p in pick_summary) / len(pick_summary)
+            s1, s2, s3  = st.columns(3)
+            for col, (val, label) in zip([s1,s2,s3],[
+                (f"{len(pick_summary)}", "Games Picked"),
+                (f"{upset_picks}",       "Upset Picks"),
+                (f"{avg_prob*100:.1f}%", "Avg Win Prob"),
+            ]):
+                with col:
+                    st.markdown(f"""
+                    <div class='metric-card'>
+                        <div class='metric-value'>{val}</div>
+                        <div class='metric-label'>{label}</div>
+                    </div>""", unsafe_allow_html=True)
+
+
+# ─── Tab 4: Efficiency Dashboard ──────────────────────────────────────────────
+with tab4:
     st.markdown("### OFFENSIVE & DEFENSIVE EFFICIENCY")
     st.markdown("All ratings adjusted for opponent strength (per 100 possessions).")
 
@@ -982,8 +1372,8 @@ with tab3:
         )
 
 
-# ─── Tab 4: Upset Analyzer ────────────────────────────────────────────────────
-with tab4:
+# ─── Tab 5: Upset Analyzer ────────────────────────────────────────────────────
+with tab5:
     st.markdown("### UPSET PROBABILITY MATRIX")
     st.markdown("Head-to-head matchup calculator incorporating AdjOE, AdjDE, continuity, and SOS.")
 
@@ -1102,8 +1492,8 @@ with tab4:
     st.dataframe(pd.DataFrame(upset_rows), use_container_width=True)
 
 
-# ─── Tab 5: Seed History ───────────────────────────────────────────────────────
-with tab5:
+# ─── Tab 6: Seed History ───────────────────────────────────────────────────────
+with tab6:
     st.markdown("### HISTORICAL SEED PERFORMANCE (1985 – 2024)")
 
     c1, c2 = st.columns(2)
@@ -1137,8 +1527,8 @@ with tab5:
     st.dataframe(notable, use_container_width=True)
 
 
-# ─── Tab 6: Monte Carlo Simulation ────────────────────────────────────────────
-with tab6:
+# ─── Tab 7: Monte Carlo Simulation ────────────────────────────────────────────
+with tab7:
     st.markdown("### MONTE CARLO CHAMPIONSHIP SIMULATION")
     st.markdown("Each game resolved via logistic model: AdjOE · AdjDE · Continuity · SOS · KenPom.")
 
