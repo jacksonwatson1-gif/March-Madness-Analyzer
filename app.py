@@ -542,9 +542,201 @@ for col, (val, label) in zip([k1,k2,k3,k4,k5], [
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# ── Bracket Visualization Helpers ─────────────────────────────────────────────
+def win_prob_color(prob: float) -> tuple:
+    """
+    Map a win probability (0–1) to a background color and text color.
+    >= 0.75 → deep green    (certain favorite)
+    0.55–0.75 → light green (moderate favorite)
+    0.45–0.55 → gold        (toss-up)
+    0.25–0.45 → light red   (moderate underdog)
+    <  0.25   → deep red    (heavy underdog)
+    """
+    if prob >= 0.75:
+        return ("#0a5c2e", "#06D6A0", "●●●●")   # bg, text, dots
+    elif prob >= 0.55:
+        return ("#1a472a", "#4ade80", "●●●○")
+    elif prob >= 0.45:
+        return ("#3d2e00", "#FFD166", "●●○○")
+    elif prob >= 0.25:
+        return ("#5c1a1a", "#f87171", "●●○○")
+    else:
+        return ("#6b0f0f", "#EF476F", "●○○○")
+
+
+def build_bracket_state(df: pd.DataFrame) -> dict:
+    """
+    Build a bracket state dict keyed by region.
+    Returns matchups for Round of 64, with win probabilities computed per slot.
+    Advancement status defaults to None (not yet played).
+    """
+    bracket = {}
+    first_round_pairs = [(1,16),(8,9),(5,12),(4,13),(6,11),(3,14),(7,10),(2,15)]
+
+    for region in REGIONS:
+        reg_df = df[df["Region"] == region].sort_values("Seed")
+        seeded = {int(row["Seed"]): row for _, row in reg_df.iterrows()}
+        matchups = []
+        for (s1, s2) in first_round_pairs:
+            if s1 in seeded and s2 in seeded:
+                t1 = seeded[s1]
+                t2 = seeded[s2]
+                up = upset_probability(
+                    t1["Seed"], t2["Seed"],
+                    t1["KenPom"], t2["KenPom"],
+                    t1.get("SOS", 0.55),        t2.get("SOS", 0.55),
+                    t1.get("Continuity", 70),   t2.get("Continuity", 70),
+                    t1.get("AdjOE", 105),        t2.get("AdjOE", 105),
+                    t1.get("AdjDE", 100),        t2.get("AdjDE", 100),
+                )
+                matchups.append({
+                    "fav":      t1,
+                    "dog":      t2,
+                    "fav_prob": up["fav_prob"],
+                    "dog_prob": up["upset_prob"],
+                    "winner":   None,    # None = not played
+                })
+        bracket[region] = matchups
+    return bracket
+
+
+def team_slot_html(team_row, prob: float, is_winner: bool = False,
+                   is_eliminated: bool = False) -> str:
+    """Render a single team slot with color-coded win probability."""
+    bg, fg, dots = win_prob_color(prob)
+    name    = str(team_row.get("Team", "TBD"))
+    seed    = int(team_row.get("Seed", 0))
+    adjem   = float(team_row.get("AdjEM", 0))
+    cont    = float(team_row.get("Continuity", 0))
+    pct_str = f"{prob*100:.0f}%"
+
+    # Override color states
+    if is_winner:
+        bg, fg = "#0a3d1f", "#06D6A0"
+    if is_eliminated:
+        bg, fg = "#1a0a0a", "#555"
+
+    adv_icon = "✓ ADV" if is_winner else ("✗ ELIM" if is_eliminated else "")
+    adv_style = "color:#06D6A0;" if is_winner else "color:#666;"
+
+    return f"""
+    <div style="
+        background:{bg};
+        border-left: 3px solid {fg};
+        border-radius: 3px;
+        padding: 5px 8px;
+        margin: 2px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 36px;
+        font-family: 'IBM Plex Mono', monospace;
+        position: relative;
+    ">
+        <div style="display:flex;align-items:center;gap:6px;">
+            <span style="color:{fg};font-size:0.65rem;font-weight:700;
+                         min-width:18px;text-align:center;">{seed}</span>
+            <span style="color:#e0e0e0;font-size:0.72rem;font-weight:500;
+                         white-space:nowrap;overflow:hidden;max-width:120px;
+                         text-overflow:ellipsis;" title="{name}">{name}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+            <span style="font-size:0.65rem;{adv_style}font-weight:700;">{adv_icon}</span>
+            <span style="
+                background:{fg}22;
+                color:{fg};
+                font-size:0.65rem;
+                font-weight:700;
+                padding:2px 5px;
+                border-radius:2px;
+                letter-spacing:1px;
+            ">{pct_str}</span>
+        </div>
+    </div>"""
+
+
+def matchup_html(matchup: dict) -> str:
+    """Render a full matchup (two team slots + connector line)."""
+    fav  = matchup["fav"]
+    dog  = matchup["dog"]
+    fp   = matchup["fav_prob"]
+    dp   = matchup["dog_prob"]
+    winner = matchup.get("winner")
+
+    fav_won  = winner == str(fav.get("Team", ""))
+    dog_won  = winner == str(dog.get("Team", ""))
+    fav_elim = dog_won
+    dog_elim = fav_won
+
+    slot1 = team_slot_html(fav, fp, is_winner=fav_won, is_eliminated=fav_elim)
+    slot2 = team_slot_html(dog, dp, is_winner=dog_won, is_eliminated=dog_elim)
+
+    return f"""
+    <div style="
+        background:#0a1628;
+        border:1px solid #1e3a5f;
+        border-radius:4px;
+        padding:6px;
+        margin-bottom:8px;
+    ">
+        {slot1}
+        <div style="height:1px;background:#1e3a5f;margin:2px 0;"></div>
+        {slot2}
+    </div>"""
+
+
+def region_bracket_html(region: str, matchups: list) -> str:
+    """Render all first-round matchups for a region."""
+    cards = "".join(matchup_html(m) for m in matchups)
+    return f"""
+    <div style="flex:1;min-width:260px;">
+        <div style="
+            font-family:'Bebas Neue',sans-serif;
+            font-size:1.2rem;
+            color:#FF6B35;
+            letter-spacing:3px;
+            padding:4px 0 8px 0;
+            border-bottom:2px solid #FF6B35;
+            margin-bottom:10px;
+        ">{region.upper()}</div>
+        {cards}
+    </div>"""
+
+
+def color_legend_html() -> str:
+    entries = [
+        ("#06D6A0", "≥75%  Heavy Favorite"),
+        ("#4ade80", "55–74%  Moderate Favorite"),
+        ("#FFD166", "45–54%  Toss-Up"),
+        ("#f87171", "25–44%  Moderate Underdog"),
+        ("#EF476F", "<25%  Heavy Underdog"),
+    ]
+    items = "".join(f"""
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+            <div style="width:12px;height:12px;border-radius:2px;
+                        background:{c};flex-shrink:0;"></div>
+            <span style="font-size:0.68rem;color:#ccc;
+                         font-family:'IBM Plex Mono',monospace;">{label}</span>
+        </div>""" for c, label in entries)
+    return f"""
+    <div style="background:#0a1628;border:1px solid #1e3a5f;border-radius:4px;
+                padding:12px;margin-bottom:16px;">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:0.65rem;
+                    color:#FF6B35;letter-spacing:2px;margin-bottom:8px;">
+            WIN PROBABILITY COLOR KEY
+        </div>
+        {items}
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid #1e3a5f;
+                    font-family:'IBM Plex Mono',monospace;font-size:0.62rem;color:#666;">
+            ✓ ADV = Advanced · ✗ ELIM = Eliminated · Colors update live
+        </div>
+    </div>"""
+
+
 # ── Tabs ───────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 BRACKET FIELD",
+    "🗂 LIVE BRACKET",
     "⚡ EFFICIENCY",
     "🎯 UPSET ANALYZER",
     "📈 SEED HISTORY",
@@ -593,8 +785,118 @@ with tab1:
             st.bar_chart(cont_avg.set_index("Seed"), use_container_width=True, height=220)
 
 
-# ─── Tab 2: Efficiency Dashboard ──────────────────────────────────────────────
+# ─── Tab 2: Live Bracket ──────────────────────────────────────────────────────
 with tab2:
+    st.markdown("### LIVE BRACKET — WIN PROBABILITY VIEW")
+    st.markdown(
+        "Each team slot is color-coded by projected win probability. "
+        "**Green** = heavy favorite · **Red** = heavy underdog. "
+        "Mark winners using the controls below to track results in real time."
+    )
+
+    if "bracket_state" not in st.session_state:
+        st.session_state.bracket_state = build_bracket_state(df_bracket)
+
+    if st.button("🔄 Reset Bracket to Pre-Tournament", key="reset_bracket"):
+        st.session_state.bracket_state = build_bracket_state(df_bracket)
+
+    bracket_state = st.session_state.bracket_state
+
+    st.markdown(color_legend_html(), unsafe_allow_html=True)
+
+    reg_tabs = st.tabs([f"🏀 {r}" for r in REGIONS])
+
+    for reg_tab, region in zip(reg_tabs, REGIONS):
+        with reg_tab:
+            matchups = bracket_state.get(region, [])
+            if not matchups:
+                st.warning(f"No matchup data for {region}.")
+                continue
+
+            st.markdown(f"#### {region.upper()} REGION — ROUND OF 64")
+            st.markdown("Select the winner of each game to update the bracket:")
+
+            for i, m in enumerate(matchups):
+                fav_name = str(m["fav"].get("Team", "Team A"))
+                dog_name = str(m["dog"].get("Team", "Team B"))
+                fav_seed = int(m["fav"].get("Seed", 0))
+                dog_seed = int(m["dog"].get("Seed", 0))
+
+                col_ctrl, col_disp = st.columns([1, 2])
+                with col_ctrl:
+                    current   = m.get("winner")
+                    options   = ["Not Played", fav_name, dog_name]
+                    def_idx   = 0
+                    if current == fav_name: def_idx = 1
+                    elif current == dog_name: def_idx = 2
+
+                    choice = st.selectbox(
+                        f"Game {i+1}: ({fav_seed}) vs ({dog_seed})",
+                        options, index=def_idx,
+                        key=f"w_{region}_{i}"
+                    )
+                    bracket_state[region][i]["winner"] = (
+                        None if choice == "Not Played" else choice
+                    )
+
+                with col_disp:
+                    st.markdown(
+                        matchup_html(bracket_state[region][i]),
+                        unsafe_allow_html=True
+                    )
+
+            st.markdown("---")
+            st.markdown(f"##### {region} — Full Visual Card")
+            st.markdown(f"""
+            <div style="background:#071429;border:1px solid #1e3a5f;
+                        border-radius:6px;padding:16px;">
+                {region_bracket_html(region, bracket_state[region])}
+            </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### FULL BRACKET — ALL 4 REGIONS")
+    all_html = "".join(
+        region_bracket_html(r, bracket_state.get(r, [])) for r in REGIONS
+    )
+    st.markdown(f"""
+    <div style="display:flex;gap:12px;flex-wrap:wrap;background:#071429;
+                border:1px solid #FF6B35;border-radius:6px;
+                padding:16px;overflow-x:auto;">
+        {all_html}
+    </div>""", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("### WIN PROBABILITY SUMMARY TABLE")
+    prob_rows = []
+    for region in REGIONS:
+        for m in bracket_state.get(region, []):
+            fav = m["fav"]; dog = m["dog"]
+            prob_rows.append({
+                "Region":   region,
+                "Matchup":  f"({int(fav['Seed'])}) vs ({int(dog['Seed'])})",
+                "Favorite": fav.get("Team",""),
+                "Fav Win%": m["fav_prob"],
+                "Underdog": dog.get("Team",""),
+                "Dog Win%": m["dog_prob"],
+                "Result":   m.get("winner") or "—",
+                "Upset?":   "✓" if (
+                    m.get("winner") and
+                    m.get("winner") == dog.get("Team","")
+                ) else "—",
+            })
+    df_probs = pd.DataFrame(prob_rows)
+    if not df_probs.empty:
+        st.dataframe(
+            df_probs.style
+                .background_gradient(subset=["Fav Win%"], cmap="Greens")
+                .background_gradient(subset=["Dog Win%"], cmap="Reds")
+                .format({"Fav Win%": "{:.1%}", "Dog Win%": "{:.1%}"}),
+            use_container_width=True, height=400,
+        )
+
+
+# ─── Tab 3: Efficiency Dashboard ──────────────────────────────────────────────
+with tab3:
     st.markdown("### OFFENSIVE & DEFENSIVE EFFICIENCY")
     st.markdown("All ratings adjusted for opponent strength (per 100 possessions).")
 
@@ -683,8 +985,8 @@ with tab2:
         )
 
 
-# ─── Tab 3: Upset Analyzer ────────────────────────────────────────────────────
-with tab3:
+# ─── Tab 4: Upset Analyzer ────────────────────────────────────────────────────
+with tab4:
     st.markdown("### UPSET PROBABILITY MATRIX")
     st.markdown("Head-to-head matchup calculator incorporating AdjOE, AdjDE, continuity, and SOS.")
 
@@ -803,8 +1105,8 @@ with tab3:
     st.dataframe(pd.DataFrame(upset_rows), use_container_width=True)
 
 
-# ─── Tab 4: Seed History ───────────────────────────────────────────────────────
-with tab4:
+# ─── Tab 5: Seed History ───────────────────────────────────────────────────────
+with tab5:
     st.markdown("### HISTORICAL SEED PERFORMANCE (1985 – 2024)")
 
     c1, c2 = st.columns(2)
@@ -838,8 +1140,8 @@ with tab4:
     st.dataframe(notable, use_container_width=True)
 
 
-# ─── Tab 5: Monte Carlo Simulation ────────────────────────────────────────────
-with tab5:
+# ─── Tab 6: Monte Carlo Simulation ────────────────────────────────────────────
+with tab6:
     st.markdown("### MONTE CARLO CHAMPIONSHIP SIMULATION")
     st.markdown("Each game resolved via logistic model: AdjOE · AdjDE · Continuity · SOS · KenPom.")
 
