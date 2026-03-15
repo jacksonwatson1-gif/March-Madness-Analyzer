@@ -21,14 +21,14 @@ from config import (
     BRACKET_MATCHUP_SEEDS, ROUND_POINTS, SEED_ROUND_WIN_RATES,
 )
 from fetch import build_full_dataset, generate_demo_bracket
-from models.upset import (
+from upset import (
     fit_model, upset_probability, get_model_info,
     compute_all_first_round, _matchup_from_rows,
 )
-from models.simulator import simulate_tournament
-from models.optimizer import optimize_bracket
-from ui.styles import CSS
-from ui.components import (
+from simulator import simulate_tournament
+from optimizer import optimize_bracket
+from styles import CSS
+from components import (
     metric_card, style_df, team_slot_html, matchup_html,
     region_bracket_html, render_color_legend, team_card_html,
     win_prob_color,
