@@ -1,260 +1,173 @@
 """
-models/optimizer.py — Expected Value bracket optimizer.
+models/simulator.py — Monte Carlo tournament simulation engine.
 
-Given Monte Carlo simulation results and a scoring system, computes the
-EV-maximizing bracket. Works backward from the championship to R64,
-computing each pick's expected point contribution.
-
-Strategies:
-  - "max_ev":     Pure expected value maximization (best for large pools)
-  - "chalk":      Always pick the favorite (baseline)
-  - "contrarian": Weight EV by inverse of ownership % (best for large pools
-                  where differentiation matters)
+Improvements over v1:
+  1. Round-specific probability adjustments (later rounds slightly more volatile).
+  2. Confidence intervals (standard error) on championship probabilities.
+  3. Per-round advancement tracking (not just championship).
+  4. Secondary tiebreaker for identical KenPom teams.
 """
 
-import pandas as pd
-import numpy as np
 import random
 import math
+import pandas as pd
+import numpy as np
 
-from config import REGIONS, BRACKET_MATCHUP_SEEDS, ROUND_POINTS
+from config import REGIONS, BRACKET_MATCHUP_SEEDS
 from upset import upset_probability
 
 
-def _get_metric(team, col, default):
-    val = team.get(col, default)
+def _get_team_metric(team, col, default):
+    """Safely extract a metric from a team row (dict or Series)."""
+    val = team.get(col, default) if isinstance(team, dict) else team.get(col, default)
     try:
         return float(val) if val is not None and not (isinstance(val, float) and math.isnan(val)) else default
     except (ValueError, TypeError):
         return default
 
 
-def _compute_win_prob(t1: dict, t2: dict, round_num: int = 1) -> float:
-    """Return probability that t1 beats t2."""
-    t1_em = _get_metric(t1, "AdjEM", 0)
-    t2_em = _get_metric(t2, "AdjEM", 0)
+def _play_game(t1, t2, round_num: int = 1) -> dict:
+    """
+    Resolve a single game between two teams.
+    Favorite determined by AdjEM, with Seed as tiebreaker.
+    """
+    t1_em = _get_team_metric(t1, "AdjEM", 0)
+    t2_em = _get_team_metric(t2, "AdjEM", 0)
 
-    if t1_em >= t2_em:
+    if t1_em > t2_em or (t1_em == t2_em and _get_team_metric(t1, "Seed", 16) < _get_team_metric(t2, "Seed", 16)):
         fav, dog = t1, t2
-        is_fav = True
     else:
         fav, dog = t2, t1
-        is_fav = False
 
     up = upset_probability(
-        fav_seed=int(_get_metric(fav, "Seed", 1)),
-        dog_seed=int(_get_metric(dog, "Seed", 16)),
-        fav_adj_oe=_get_metric(fav, "AdjOE", 110),
-        dog_adj_oe=_get_metric(dog, "AdjOE", 100),
-        fav_adj_de=_get_metric(fav, "AdjDE", 95),
-        dog_adj_de=_get_metric(dog, "AdjDE", 105),
-        fav_sos=_get_metric(fav, "SOS", 0.55),
-        dog_sos=_get_metric(dog, "SOS", 0.45),
-        fav_continuity=_get_metric(fav, "Continuity", 70),
-        dog_continuity=_get_metric(dog, "Continuity", 70),
-        fav_tempo=_get_metric(fav, "Tempo", 68),
-        dog_tempo=_get_metric(dog, "Tempo", 68),
-        fav_tov=_get_metric(fav, "TOV%", 16),
-        dog_tov=_get_metric(dog, "TOV%", 16),
-        dog_three_var=_get_metric(dog, "3P_Var", 0.04),
-        fav_ft_rate=_get_metric(fav, "FTRate", 0.30),
-        dog_ft_rate=_get_metric(dog, "FTRate", 0.30),
+        fav_seed=int(_get_team_metric(fav, "Seed", 1)),
+        dog_seed=int(_get_team_metric(dog, "Seed", 16)),
+        fav_adj_oe=_get_team_metric(fav, "AdjOE", 110),
+        dog_adj_oe=_get_team_metric(dog, "AdjOE", 100),
+        fav_adj_de=_get_team_metric(fav, "AdjDE", 95),
+        dog_adj_de=_get_team_metric(dog, "AdjDE", 105),
+        fav_sos=_get_team_metric(fav, "SOS", 0.55),
+        dog_sos=_get_team_metric(dog, "SOS", 0.45),
+        fav_continuity=_get_team_metric(fav, "Continuity", 70),
+        dog_continuity=_get_team_metric(dog, "Continuity", 70),
+        fav_tempo=_get_team_metric(fav, "Tempo", 68),
+        dog_tempo=_get_team_metric(dog, "Tempo", 68),
+        fav_tov=_get_team_metric(fav, "TOV%", 16),
+        dog_tov=_get_team_metric(dog, "TOV%", 16),
+        dog_three_var=_get_team_metric(dog, "3P_Var", 0.04),
+        fav_ft_rate=_get_team_metric(fav, "FTRate", 0.30),
+        dog_ft_rate=_get_team_metric(dog, "FTRate", 0.30),
         round_num=round_num,
     )
 
-    if is_fav:
-        return up["fav_prob"]
-    else:
-        return up["upset_prob"]
+    return dog if random.random() < up["upset_prob"] else fav
 
 
-def optimize_bracket(
+def simulate_tournament(
     df: pd.DataFrame,
-    scoring: str = "espn",
-    strategy: str = "max_ev",
-    pool_size: int = 5,
+    n_sims: int = 1000,
+    seed: int | None = None,
 ) -> dict:
     """
-    Compute the EV-maximizing bracket.
-
-    Args:
-        df:        Full bracket DataFrame with all team stats.
-        scoring:   Scoring system key from ROUND_POINTS.
-        strategy:  "max_ev", "chalk", or "contrarian".
-        pool_size: Number of participants (affects contrarian weighting).
+    Run n_sims full tournament simulations.
 
     Returns dict with:
-        - "picks": list of dicts {round, region, matchup, pick, ev, win_prob}
-        - "total_ev": total expected points for the bracket
-        - "strategy": strategy used
+      - "results": DataFrame with per-team probabilities for each round
+      - "champion_counts": dict of team -> count
+      - "confidence": dict of team -> (lower_95, upper_95) for championship prob
+      - "n_sims": number of simulations run
     """
-    points = ROUND_POINTS.get(scoring, ROUND_POINTS["espn"])
-    all_picks = []
+    if seed is not None:
+        random.seed(seed)
 
-    region_winners = {}
+    round_names = ["R64", "R32", "S16", "E8", "F4", "Champ"]
+    team_names = df["Team"].tolist()
 
-    for region in REGIONS:
-        reg_df = df[df["Region"] == region].sort_values("Seed")
-        seeded = {int(row["Seed"]): row.to_dict() for _, row in reg_df.iterrows()}
+    # Initialize counters: team -> [R64_wins, R32_wins, S16_wins, E8_wins, F4_wins, Champ_wins]
+    advancement = {name: [0] * 6 for name in team_names}
 
-        # ── Round of 64 ──
-        r64_winners = []
-        for pair_idx, (s1, s2) in enumerate(BRACKET_MATCHUP_SEEDS):
-            if s1 not in seeded or s2 not in seeded:
-                continue
+    for _ in range(n_sims):
+        # Region phase: R64 -> E8
+        region_winners = []
 
-            t1 = seeded[s1]
-            t2 = seeded[s2]
-            p1 = _compute_win_prob(t1, t2, round_num=1)
-            p2 = 1 - p1
+        for region in REGIONS:
+            region_df = df[df["Region"] == region].sort_values("Seed")
+            seeded = {int(row["Seed"]): row.to_dict() for _, row in region_df.iterrows()}
 
-            ev1 = p1 * points[0]
-            ev2 = p2 * points[0]
+            # Build bracket tree in standard order
+            bracket_order = [s for s1, s2 in BRACKET_MATCHUP_SEEDS for s in (s1, s2)]
+            pool = [seeded[s] for s in bracket_order if s in seeded]
 
-            if strategy == "chalk":
-                pick = t1 if s1 < s2 else t2
-                pick_prob = p1 if s1 < s2 else p2
-                pick_ev = ev1 if s1 < s2 else ev2
-            elif strategy == "contrarian":
-                # Weight by inverse of expected public pick rate
-                # Higher seeds get picked more by public → discount their EV
-                public_pick_1 = p1 ** 0.7  # Public overweights favorites
-                public_pick_2 = 1 - public_pick_1
-                leverage_1 = ev1 * (1 - public_pick_1) ** (1 / max(pool_size - 1, 1))
-                leverage_2 = ev2 * (1 - public_pick_2) ** (1 / max(pool_size - 1, 1))
-                if leverage_1 >= leverage_2:
-                    pick, pick_prob, pick_ev = t1, p1, ev1
-                else:
-                    pick, pick_prob, pick_ev = t2, p2, ev2
-            else:  # max_ev
-                if ev1 >= ev2:
-                    pick, pick_prob, pick_ev = t1, p1, ev1
-                else:
-                    pick, pick_prob, pick_ev = t2, p2, ev2
+            round_num = 1  # R64
+            while len(pool) > 1:
+                next_pool = []
+                for i in range(0, len(pool), 2):
+                    if i + 1 >= len(pool):
+                        next_pool.append(pool[i])
+                    else:
+                        winner = _play_game(pool[i], pool[i + 1], round_num=round_num)
+                        round_idx = min(round_num - 1, 5)
+                        advancement[winner["Team"]][round_idx] += 1
+                        next_pool.append(winner)
+                pool = next_pool
+                round_num += 1
 
-            r64_winners.append(pick)
-            all_picks.append({
-                "Round":    "R64",
-                "Region":   region,
-                "Matchup":  f"({s1}) vs ({s2})",
-                "Pick":     pick["Team"],
-                "Seed":     int(_get_metric(pick, "Seed", 0)),
-                "WinProb":  round(pick_prob, 3),
-                "EV":       round(pick_ev, 2),
-            })
+            if pool:
+                region_winners.append(pool[0])
 
-        # ── Later rounds within region (R32, S16, E8) ──
-        pool = r64_winners
-        for round_idx in range(1, 4):  # R32=1, S16=2, E8=3
-            round_name = ["R32", "S16", "E8"][round_idx - 1]
+        # Final Four + Championship
+        ff_pool = region_winners[:]
+        round_num = 5  # Final Four
+
+        while len(ff_pool) > 1:
             next_pool = []
-            for i in range(0, len(pool), 2):
-                if i + 1 >= len(pool):
-                    next_pool.append(pool[i])
-                    continue
-
-                t1 = pool[i]
-                t2 = pool[i + 1]
-                p1 = _compute_win_prob(t1, t2, round_num=round_idx + 1)
-                p2 = 1 - p1
-                ev1 = p1 * points[round_idx]
-                ev2 = p2 * points[round_idx]
-
-                if strategy == "chalk":
-                    s1 = int(_get_metric(t1, "Seed", 16))
-                    s2 = int(_get_metric(t2, "Seed", 16))
-                    if s1 <= s2:
-                        pick, pick_prob, pick_ev = t1, p1, ev1
-                    else:
-                        pick, pick_prob, pick_ev = t2, p2, ev2
-                elif strategy == "contrarian":
-                    public_pick_1 = p1 ** 0.7
-                    public_pick_2 = 1 - public_pick_1
-                    lev1 = ev1 * (1 - public_pick_1) ** (1 / max(pool_size - 1, 1))
-                    lev2 = ev2 * (1 - public_pick_2) ** (1 / max(pool_size - 1, 1))
-                    if lev1 >= lev2:
-                        pick, pick_prob, pick_ev = t1, p1, ev1
-                    else:
-                        pick, pick_prob, pick_ev = t2, p2, ev2
+            for i in range(0, len(ff_pool), 2):
+                if i + 1 >= len(ff_pool):
+                    next_pool.append(ff_pool[i])
                 else:
-                    if ev1 >= ev2:
-                        pick, pick_prob, pick_ev = t1, p1, ev1
-                    else:
-                        pick, pick_prob, pick_ev = t2, p2, ev2
+                    winner = _play_game(ff_pool[i], ff_pool[i + 1], round_num=round_num)
+                    round_idx = min(round_num - 1, 5)
+                    advancement[winner["Team"]][round_idx] += 1
+                    next_pool.append(winner)
+            ff_pool = next_pool
+            round_num += 1
 
-                next_pool.append(pick)
-                all_picks.append({
-                    "Round":    round_name,
-                    "Region":   region,
-                    "Matchup":  f"{t1['Team']} vs {t2['Team']}",
-                    "Pick":     pick["Team"],
-                    "Seed":     int(_get_metric(pick, "Seed", 0)),
-                    "WinProb":  round(pick_prob, 3),
-                    "EV":       round(pick_ev, 2),
-                })
-            pool = next_pool
+    # Build results DataFrame
+    df_result = df.copy()
 
-        if pool:
-            region_winners[region] = pool[0]
+    for i, rname in enumerate(round_names):
+        df_result[f"{rname}_Prob"] = df_result["Team"].map(
+            lambda t, idx=i: round(advancement.get(t, [0]*6)[idx] / n_sims, 4)
+        )
 
-    # ── Final Four ──
-    ff_teams = [region_winners.get(r) for r in REGIONS if r in region_winners]
+    df_result["ChampionshipProb"] = df_result["Champ_Prob"]
 
-    if len(ff_teams) >= 4:
-        # Semifinal 1: East vs West (or first two)
-        # Semifinal 2: South vs Midwest (or last two)
-        for semi_idx, (i, j) in enumerate([(0, 1), (2, 3)]):
-            t1 = ff_teams[i]
-            t2 = ff_teams[j]
-            p1 = _compute_win_prob(t1, t2, round_num=5)
-            p2 = 1 - p1
-            ev1 = p1 * points[4]
-            ev2 = p2 * points[4]
+    # Confidence intervals (Wilson score interval for binomial)
+    confidence = {}
+    for team_name in team_names:
+        champ_count = advancement.get(team_name, [0]*6)[5]
+        p_hat = champ_count / n_sims
+        z = 1.96  # 95% CI
 
-            if ev1 >= ev2:
-                pick, pick_prob, pick_ev = t1, p1, ev1
-            else:
-                pick, pick_prob, pick_ev = t2, p2, ev2
-
-            ff_teams[semi_idx * 2] = pick  # Winner advances
-            all_picks.append({
-                "Round":    "F4",
-                "Region":   "Final Four",
-                "Matchup":  f"{t1['Team']} vs {t2['Team']}",
-                "Pick":     pick["Team"],
-                "Seed":     int(_get_metric(pick, "Seed", 0)),
-                "WinProb":  round(pick_prob, 3),
-                "EV":       round(pick_ev, 2),
-            })
-
-        # Championship
-        t1 = ff_teams[0]
-        t2 = ff_teams[2]
-        p1 = _compute_win_prob(t1, t2, round_num=6)
-        p2 = 1 - p1
-        ev1 = p1 * points[5]
-        ev2 = p2 * points[5]
-
-        if ev1 >= ev2:
-            pick, pick_prob, pick_ev = t1, p1, ev1
+        if n_sims > 0:
+            denom = 1 + z**2 / n_sims
+            center = (p_hat + z**2 / (2 * n_sims)) / denom
+            spread = z * math.sqrt((p_hat * (1 - p_hat) + z**2 / (4 * n_sims)) / n_sims) / denom
+            lower = max(0, center - spread)
+            upper = min(1, center + spread)
         else:
-            pick, pick_prob, pick_ev = t2, p2, ev2
+            lower, upper = 0, 0
 
-        all_picks.append({
-            "Round":    "Champ",
-            "Region":   "Championship",
-            "Matchup":  f"{t1['Team']} vs {t2['Team']}",
-            "Pick":     pick["Team"],
-            "Seed":     int(_get_metric(pick, "Seed", 0)),
-            "WinProb":  round(pick_prob, 3),
-            "EV":       round(pick_ev, 2),
-        })
+        confidence[team_name] = (round(lower, 4), round(upper, 4))
 
-    total_ev = sum(p["EV"] for p in all_picks)
+    df_result["CI_Lower"] = df_result["Team"].map(lambda t: confidence.get(t, (0,0))[0])
+    df_result["CI_Upper"] = df_result["Team"].map(lambda t: confidence.get(t, (0,0))[1])
+
+    df_result = df_result.sort_values("ChampionshipProb", ascending=False)
 
     return {
-        "picks":    all_picks,
-        "total_ev": round(total_ev, 2),
-        "strategy": strategy,
-        "scoring":  scoring,
+        "results": df_result,
+        "advancement": advancement,
+        "confidence": confidence,
+        "n_sims": n_sims,
     }
