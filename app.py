@@ -20,7 +20,7 @@ from config import (
     REGIONS, ROUNDS, CONFERENCES, HISTORICAL_UPSET_RATES,
     BRACKET_MATCHUP_SEEDS, ROUND_POINTS, SEED_ROUND_WIN_RATES,
 )
-from data.fetch import build_full_dataset, generate_demo_bracket
+from fetch import build_full_dataset, generate_demo_bracket
 from models.upset import (
     fit_model, upset_probability, get_model_info,
     compute_all_first_round, _matchup_from_rows,
