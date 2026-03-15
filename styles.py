@@ -1,230 +1,146 @@
 """
-ui/components.py — Reusable HTML card builders and bracket visualization helpers.
+ui/styles.py — All CSS for the March Madness Analyzer.
 """
 
-import streamlit as st
-import pandas as pd
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
 
+:root {
+    --orange: #FF6B35;
+    --navy:   #0B1F3A;
+    --cream:  #F5F0E8;
+    --gold:   #FFD166;
+    --green:  #06D6A0;
+    --red:    #EF476F;
+    --card:   #0F2847;
+    --purple: #c084fc;
+    --blue:   #60a5fa;
+}
 
-def metric_card(value: str, label: str, size: str = "2.4rem") -> str:
-    return f"""
-    <div class='metric-card'>
-        <div class='metric-value' style='font-size:{size};'>{value}</div>
-        <div class='metric-label'>{label}</div>
-    </div>"""
+html, body, [class*="css"] {
+    background-color: var(--navy);
+    color: var(--cream);
+    font-family: 'IBM Plex Sans', sans-serif;
+}
 
+h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
 
-def win_prob_color(prob: float) -> tuple:
-    """Map win probability (0–1) → (bg, fg, dots)."""
-    if prob >= 0.75:
-        return ("#0a5c2e", "#06D6A0", "●●●●")
-    elif prob >= 0.55:
-        return ("#1a472a", "#4ade80", "●●●○")
-    elif prob >= 0.45:
-        return ("#3d2e00", "#FFD166", "●●○○")
-    elif prob >= 0.25:
-        return ("#5c1a1a", "#f87171", "●●○○")
-    else:
-        return ("#6b0f0f", "#EF476F", "●○○○")
+.main-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 4rem;
+    color: var(--orange);
+    line-height: 1;
+    letter-spacing: 4px;
+}
 
+.subtitle {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--gold);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+}
 
-def team_slot_html(
-    team_row, prob: float,
-    is_winner: bool = False,
-    is_eliminated: bool = False,
-) -> str:
-    bg, fg, dots = win_prob_color(prob)
-    name = str(team_row.get("Team", "TBD"))
-    seed = int(team_row.get("Seed", 0))
-    pct_str = f"{prob*100:.0f}%"
+.metric-card {
+    background: var(--card);
+    border: 1px solid var(--orange);
+    border-radius: 4px;
+    padding: 1.2rem;
+    text-align: center;
+    margin: 0.3rem 0;
+}
 
-    if is_winner:
-        bg, fg = "#0a3d1f", "#06D6A0"
-    if is_eliminated:
-        bg, fg = "#1a0a0a", "#555"
+.metric-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    color: var(--gold);
+}
 
-    adv_icon = "✓ ADV" if is_winner else ("✗ ELIM" if is_eliminated else "")
-    adv_style = "color:#06D6A0;" if is_winner else "color:#666;"
+.metric-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--orange);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
 
-    return f"""
-    <div style="
-        background:{bg};
-        border-left: 3px solid {fg};
-        border-radius: 3px;
-        padding: 5px 8px;
-        margin: 2px 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-height: 36px;
-        font-family: 'IBM Plex Mono', monospace;
-    ">
-        <div style="display:flex;align-items:center;gap:6px;">
-            <span style="color:{fg};font-size:0.65rem;font-weight:700;
-                         min-width:18px;text-align:center;">{seed}</span>
-            <span style="color:#e0e0e0;font-size:0.72rem;font-weight:500;
-                         white-space:nowrap;overflow:hidden;max-width:120px;
-                         text-overflow:ellipsis;" title="{name}">{name}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;">
-            <span style="font-size:0.65rem;{adv_style}font-weight:700;">{adv_icon}</span>
-            <span style="
-                background:{fg}22;
-                color:{fg};
-                font-size:0.65rem;
-                font-weight:700;
-                padding:2px 5px;
-                border-radius:2px;
-                letter-spacing:1px;
-            ">{pct_str}</span>
-        </div>
-    </div>"""
+.upset-high   { color: #EF476F; font-weight: 600; }
+.upset-medium { color: #FFD166; font-weight: 600; }
+.upset-low    { color: #06D6A0; font-weight: 600; }
 
+.badge-live { background:#06D6A0; color:#000; padding:2px 8px;
+              border-radius:3px; font-size:0.65rem;
+              font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
+.badge-demo { background:#FF6B35; color:#000; padding:2px 8px;
+              border-radius:3px; font-size:0.65rem;
+              font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
 
-def matchup_html(matchup: dict) -> str:
-    fav = matchup["fav"]
-    dog = matchup["dog"]
-    fp = matchup["fav_prob"]
-    dp = matchup["dog_prob"]
-    winner = matchup.get("winner")
+.badge-fitted { background:#06D6A0; color:#000; padding:2px 8px;
+                border-radius:3px; font-size:0.65rem;
+                font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
+.badge-default { background:#FFD166; color:#000; padding:2px 8px;
+                 border-radius:3px; font-size:0.65rem;
+                 font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
 
-    fav_won = winner == str(fav.get("Team", ""))
-    dog_won = winner == str(dog.get("Team", ""))
+.stSelectbox label, .stSlider label, .stMultiSelect label {
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-size: 0.75rem !important;
+    color: var(--orange) !important;
+    letter-spacing: 2px !important;
+    text-transform: uppercase !important;
+}
 
-    slot1 = team_slot_html(fav, fp, is_winner=fav_won, is_eliminated=dog_won)
-    slot2 = team_slot_html(dog, dp, is_winner=dog_won, is_eliminated=fav_won)
+div[data-testid="stSidebar"] {
+    background-color: #071429;
+    border-right: 2px solid var(--orange);
+}
 
-    return f"""
-    <div style="
-        background:#0a1628;
-        border:1px solid #1e3a5f;
-        border-radius:4px;
-        padding:6px;
-        margin-bottom:8px;
-    ">
-        {slot1}
-        <div style="height:1px;background:#1e3a5f;margin:2px 0;"></div>
-        {slot2}
-    </div>"""
+.stDataFrame { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
 
+section[data-testid="stSidebar"] h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    color: var(--orange);
+    letter-spacing: 3px;
+}
 
-def region_bracket_html(region: str, matchups: list) -> str:
-    cards = "".join(matchup_html(m) for m in matchups)
-    return f"""
-    <div style="flex:1;min-width:260px;">
-        <div style="
-            font-family:'Bebas Neue',sans-serif;
-            font-size:1.2rem;
-            color:#FF6B35;
-            letter-spacing:3px;
-            padding:4px 0 8px 0;
-            border-bottom:2px solid #FF6B35;
-            margin-bottom:10px;
-        ">{region.upper()}</div>
-        {cards}
-    </div>"""
+button[data-baseweb="tab"] div p {
+    color: #FFD166 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    font-weight: 600 !important;
+    letter-spacing: 1px !important;
+    transition: all 0.3s ease !important;
+}
 
+button[data-baseweb="tab"]:hover div p {
+    color: #FFFFFF !important;
+    text-shadow: 0 0 10px rgba(255, 209, 102, 0.8) !important;
+}
 
-def render_color_legend():
-    entries = [
-        ("🟢", "#06D6A0", "≥ 75%",   "Heavy Fav"),
-        ("🟩", "#4ade80", "55–74%",  "Mod. Fav"),
-        ("🟡", "#FFD166", "45–54%",  "Toss-Up"),
-        ("🟥", "#f87171", "25–44%",  "Mod. Dog"),
-        ("🔴", "#EF476F", "< 25%",   "Heavy Dog"),
-    ]
-    st.markdown("**WIN PROBABILITY COLOR KEY**")
-    cols = st.columns(5)
-    for col, (icon, color, pct, label) in zip(cols, entries):
-        with col:
-            st.markdown(
-                f"<div style='background:{color}22;border-left:4px solid {color};"
-                f"border-radius:3px;padding:8px 10px;text-align:center;'>"
-                f"<div style='font-size:1.2rem;'>{icon}</div>"
-                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.7rem;"
-                f"color:{color};font-weight:700;'>{pct}</div>"
-                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.62rem;"
-                f"color:#aaa;margin-top:2px;'>{label}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+button[aria-selected="true"] div p {
+    color: #FF6B35 !important;
+    border-bottom: 2px solid #FF6B35 !important;
+}
 
+button[data-baseweb="tab"]:hover {
+    background-color: rgba(255, 209, 102, 0.1) !important;
+}
 
-def style_df(df: pd.DataFrame, fmt: dict = None) -> pd.io.formats.style.Styler:
-    """Style a DataFrame with gold headers and optional heat-map columns."""
-    display_df = df.copy()
+.stDataFrame th, .stTable th, div[data-testid="stTable"] th {
+    background-color: #FFD166 !important;
+    border: 1px solid #FF6B35 !important;
+}
 
-    # Clean percentage columns
-    for col in ["Win Prob", "Win%", "ChampionshipProb", "Champ_Prob",
-                "R64_Prob", "R32_Prob", "S16_Prob", "E8_Prob", "F4_Prob"]:
-        if col in display_df.columns:
-            display_df[col] = pd.to_numeric(
-                display_df[col].astype(str).str.replace('%', ''), errors='coerce'
-            )
+.stDataFrame th div, .stTable th div, div[data-testid="stTable"] th div {
+    color: #0B1F3A !important;
+    font-weight: 800 !important;
+    font-family: 'IBM Plex Mono', monospace !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+}
 
-    styled = display_df.style
-
-    # Heat-map on probability columns
-    for col in ["Win Prob", "Win%", "ChampionshipProb", "Champ_Prob", "WinProb"]:
-        if col in display_df.columns:
-            styled = styled.background_gradient(subset=[col], cmap='RdYlGn', vmin=0, vmax=1)
-
-    # Gold header styling
-    styled = styled.set_table_styles([
-        {'selector': 'th', 'props': [
-            ('background-color', '#FFD166'),
-            ('color', '#0B1F3A'),
-            ('font-weight', 'bold'),
-        ]}
-    ])
-
-    if fmt:
-        styled = styled.format(fmt, na_rep="—")
-
-    return styled
-
-
-def team_card_html(data, label: str) -> str:
-    """Full team stat card for the upset analyzer."""
-    adjoe = float(data.get("AdjOE", 0))
-    adjde = float(data.get("AdjDE", 0))
-    adjem = float(data.get("AdjEM", 0))
-    cont = float(data.get("Continuity", 70))
-    tempo = float(data.get("Tempo", 68))
-    tov = float(data.get("TOV%", 16))
-
-    return f"""
-    <div class='metric-card'>
-    <div class='metric-label'>{label} | Seed · {data['Seed']} | Region · {data.get('Region','?')}</div>
-    <div style='font-size:0.85rem;color:#aaa;margin-bottom:0.8rem;'>
-        {data.get('Conference','?')}
-    </div>
-    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;'>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#06D6A0;'>{adjoe:.1f}</div>
-            <div class='metric-label'>AdjOE</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#EF476F;'>{adjde:.1f}</div>
-            <div class='metric-label'>AdjDE</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#FFD166;'>{adjem:+.1f}</div>
-            <div class='metric-label'>AdjEM</div>
-        </div>
-    </div>
-    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-top:0.5rem;'>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#aaa;'>{cont:.0f}%</div>
-            <div class='metric-label'>Continuity</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#60a5fa;'>{tempo:.1f}</div>
-            <div class='metric-label'>Tempo</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#c084fc;'>{tov:.1f}</div>
-            <div class='metric-label'>TOV%</div>
-        </div>
-    </div>
-    </div>"""
+.stDataFrame td {
+    color: #F5F0E8 !important;
+}
+</style>
+"""
