@@ -18,7 +18,7 @@ import random
 import math
 
 from config import REGIONS, BRACKET_MATCHUP_SEEDS, ROUND_POINTS
-from models.upset import upset_probability
+from upset import upset_probability
 
 
 def _get_metric(team, col, default):
