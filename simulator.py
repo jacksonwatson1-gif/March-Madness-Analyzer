@@ -1,173 +1,176 @@
 """
-models/simulator.py — Monte Carlo tournament simulation engine.
-
-Improvements over v1:
-  1. Round-specific probability adjustments (later rounds slightly more volatile).
-  2. Confidence intervals (standard error) on championship probabilities.
-  3. Per-round advancement tracking (not just championship).
-  4. Secondary tiebreaker for identical KenPom teams.
+simulator.py — March Madness Analyzer v3
+==========================================
+Monte Carlo tournament simulation using 9-feature logistic model.
 """
 
 import random
 import math
-import pandas as pd
-import numpy as np
-
+from collections import defaultdict
 from config import REGIONS, BRACKET_MATCHUP_SEEDS
-from upset import upset_probability
+from upset import _matchup_from_rows
 
 
-def _get_team_metric(team, col, default):
-    """Safely extract a metric from a team row (dict or Series)."""
-    val = team.get(col, default) if isinstance(team, dict) else team.get(col, default)
-    try:
-        return float(val) if val is not None and not (isinstance(val, float) and math.isnan(val)) else default
-    except (ValueError, TypeError):
-        return default
+def _game_result(team_a, team_b, round_num=1):
+    """Simulate a single game. Returns winner row."""
+    seed_a = int(team_a.get("Seed", 8))
+    seed_b = int(team_b.get("Seed", 8))
 
-
-def _play_game(t1, t2, round_num: int = 1) -> dict:
-    """
-    Resolve a single game between two teams.
-    Favorite determined by AdjEM, with Seed as tiebreaker.
-    """
-    t1_em = _get_team_metric(t1, "AdjEM", 0)
-    t2_em = _get_team_metric(t2, "AdjEM", 0)
-
-    if t1_em > t2_em or (t1_em == t2_em and _get_team_metric(t1, "Seed", 16) < _get_team_metric(t2, "Seed", 16)):
-        fav, dog = t1, t2
+    if seed_a <= seed_b:
+        fav, dog = team_a, team_b
     else:
-        fav, dog = t2, t1
+        fav, dog = team_b, team_a
 
-    up = upset_probability(
-        fav_seed=int(_get_team_metric(fav, "Seed", 1)),
-        dog_seed=int(_get_team_metric(dog, "Seed", 16)),
-        fav_adj_oe=_get_team_metric(fav, "AdjOE", 110),
-        dog_adj_oe=_get_team_metric(dog, "AdjOE", 100),
-        fav_adj_de=_get_team_metric(fav, "AdjDE", 95),
-        dog_adj_de=_get_team_metric(dog, "AdjDE", 105),
-        fav_sos=_get_team_metric(fav, "SOS", 0.55),
-        dog_sos=_get_team_metric(dog, "SOS", 0.45),
-        fav_continuity=_get_team_metric(fav, "Continuity", 70),
-        dog_continuity=_get_team_metric(dog, "Continuity", 70),
-        fav_tempo=_get_team_metric(fav, "Tempo", 68),
-        dog_tempo=_get_team_metric(dog, "Tempo", 68),
-        fav_tov=_get_team_metric(fav, "TOV%", 16),
-        dog_tov=_get_team_metric(dog, "TOV%", 16),
-        dog_three_var=_get_team_metric(dog, "3P_Var", 0.04),
-        fav_ft_rate=_get_team_metric(fav, "FTRate", 0.30),
-        dog_ft_rate=_get_team_metric(dog, "FTRate", 0.30),
-        round_num=round_num,
-    )
+    m = _matchup_from_rows(fav, dog, round_num=round_num)
+    upset_prob = m["upset_prob"]
 
-    return dog if random.random() < up["upset_prob"] else fav
+    if random.random() < upset_prob:
+        return dog
+    return fav
 
 
-def simulate_tournament(
-    df: pd.DataFrame,
-    n_sims: int = 1000,
-    seed: int | None = None,
-) -> dict:
+def _simulate_region(teams_by_seed, round_num_start=1):
     """
-    Run n_sims full tournament simulations.
+    Simulate a single region from R64 through regional final.
+    Returns list of advancing teams at each round + regional champion.
+    """
+    # R64 matchups
+    matchup_order = BRACKET_MATCHUP_SEEDS
+    current_round = []
+
+    for s1, s2 in matchup_order:
+        if s1 in teams_by_seed and s2 in teams_by_seed:
+            winner = _game_result(teams_by_seed[s1], teams_by_seed[s2], round_num_start)
+            current_round.append(winner)
+        elif s1 in teams_by_seed:
+            current_round.append(teams_by_seed[s1])
+        elif s2 in teams_by_seed:
+            current_round.append(teams_by_seed[s2])
+
+    round_num = round_num_start + 1
+
+    # Subsequent rounds until 1 remains
+    while len(current_round) > 1:
+        next_round = []
+        for i in range(0, len(current_round), 2):
+            if i + 1 < len(current_round):
+                winner = _game_result(current_round[i], current_round[i + 1], round_num)
+                next_round.append(winner)
+            else:
+                next_round.append(current_round[i])
+        current_round = next_round
+        round_num += 1
+
+    return current_round[0] if current_round else None
+
+
+def simulate_tournament(df, n_sims=2000):
+    """
+    Run n_sims Monte Carlo simulations of the full tournament.
 
     Returns dict with:
-      - "results": DataFrame with per-team probabilities for each round
-      - "champion_counts": dict of team -> count
-      - "confidence": dict of team -> (lower_95, upper_95) for championship prob
-      - "n_sims": number of simulations run
+        - results: DataFrame sorted by championship probability
+        - confidence: dict of team → (ci_lower, ci_upper) at 95%
     """
-    if seed is not None:
-        random.seed(seed)
+    # Build per-region seed maps
+    region_teams = {}
+    for region in REGIONS:
+        reg_df = df[df["Region"] == region]
+        region_teams[region] = {int(row["Seed"]): row for _, row in reg_df.iterrows()}
+
+    # Tracking
+    round_counts = defaultdict(lambda: defaultdict(int))  # team → round → count
+    champ_counts = defaultdict(int)
 
     round_names = ["R64", "R32", "S16", "E8", "F4", "Champ"]
-    team_names = df["Team"].tolist()
-
-    # Initialize counters: team -> [R64_wins, R32_wins, S16_wins, E8_wins, F4_wins, Champ_wins]
-    advancement = {name: [0] * 6 for name in team_names}
 
     for _ in range(n_sims):
-        # Region phase: R64 -> E8
-        region_winners = []
-
+        # All teams start in R64
         for region in REGIONS:
-            region_df = df[df["Region"] == region].sort_values("Seed")
-            seeded = {int(row["Seed"]): row.to_dict() for _, row in region_df.iterrows()}
+            for seed, team_row in region_teams[region].items():
+                team = str(team_row.get("Team", ""))
+                round_counts[team]["R64"] += 1
 
-            # Build bracket tree in standard order
-            bracket_order = [s for s1, s2 in BRACKET_MATCHUP_SEEDS for s in (s1, s2)]
-            pool = [seeded[s] for s in bracket_order if s in seeded]
+        # Simulate each region
+        regional_champs = []
+        for region in REGIONS:
+            teams = region_teams[region]
+            # R64
+            matchups = BRACKET_MATCHUP_SEEDS
+            r64_winners = []
+            for s1, s2 in matchups:
+                if s1 in teams and s2 in teams:
+                    w = _game_result(teams[s1], teams[s2], 1)
+                    r64_winners.append(w)
+                    round_counts[str(w.get("Team", ""))]["R32"] += 1
 
-            round_num = 1  # R64
-            while len(pool) > 1:
-                next_pool = []
-                for i in range(0, len(pool), 2):
-                    if i + 1 >= len(pool):
-                        next_pool.append(pool[i])
-                    else:
-                        winner = _play_game(pool[i], pool[i + 1], round_num=round_num)
-                        round_idx = min(round_num - 1, 5)
-                        advancement[winner["Team"]][round_idx] += 1
-                        next_pool.append(winner)
-                pool = next_pool
-                round_num += 1
+            # R32
+            r32_winners = []
+            for i in range(0, len(r64_winners), 2):
+                if i + 1 < len(r64_winners):
+                    w = _game_result(r64_winners[i], r64_winners[i + 1], 2)
+                    r32_winners.append(w)
+                    round_counts[str(w.get("Team", ""))]["S16"] += 1
 
-            if pool:
-                region_winners.append(pool[0])
+            # S16
+            s16_winners = []
+            for i in range(0, len(r32_winners), 2):
+                if i + 1 < len(r32_winners):
+                    w = _game_result(r32_winners[i], r32_winners[i + 1], 3)
+                    s16_winners.append(w)
+                    round_counts[str(w.get("Team", ""))]["E8"] += 1
 
-        # Final Four + Championship
-        ff_pool = region_winners[:]
-        round_num = 5  # Final Four
+            # E8 (regional final)
+            if len(s16_winners) >= 2:
+                champ = _game_result(s16_winners[0], s16_winners[1], 4)
+                round_counts[str(champ.get("Team", ""))]["F4"] += 1
+                regional_champs.append(champ)
+            elif s16_winners:
+                round_counts[str(s16_winners[0].get("Team", ""))]["F4"] += 1
+                regional_champs.append(s16_winners[0])
 
-        while len(ff_pool) > 1:
-            next_pool = []
-            for i in range(0, len(ff_pool), 2):
-                if i + 1 >= len(ff_pool):
-                    next_pool.append(ff_pool[i])
-                else:
-                    winner = _play_game(ff_pool[i], ff_pool[i + 1], round_num=round_num)
-                    round_idx = min(round_num - 1, 5)
-                    advancement[winner["Team"]][round_idx] += 1
-                    next_pool.append(winner)
-            ff_pool = next_pool
-            round_num += 1
+        # Final Four
+        if len(regional_champs) >= 4:
+            # Semis: East vs Midwest, South vs West (standard bracket)
+            semi1 = _game_result(regional_champs[0], regional_champs[2], 5)
+            semi2 = _game_result(regional_champs[3], regional_champs[1], 5)
+            # Championship
+            champion = _game_result(semi1, semi2, 6)
+            champ_name = str(champion.get("Team", ""))
+            champ_counts[champ_name] += 1
+            round_counts[champ_name]["Champ"] += 1
 
     # Build results DataFrame
-    df_result = df.copy()
+    results = []
+    for _, row in df.iterrows():
+        team = str(row["Team"])
+        entry = row.to_dict()
+        for rnd in round_names:
+            entry[f"{rnd}_Prob"] = round_counts[team].get(rnd, 0) / n_sims
+        entry["ChampionshipProb"] = champ_counts.get(team, 0) / n_sims
+        results.append(entry)
 
-    for i, rname in enumerate(round_names):
-        df_result[f"{rname}_Prob"] = df_result["Team"].map(
-            lambda t, idx=i: round(advancement.get(t, [0]*6)[idx] / n_sims, 4)
-        )
+    results_df = pd.DataFrame(results).sort_values("ChampionshipProb", ascending=False)
 
-    df_result["ChampionshipProb"] = df_result["Champ_Prob"]
-
-    # Confidence intervals (Wilson score interval for binomial)
+    # 95% confidence intervals (Wilson score interval approximation)
     confidence = {}
-    for team_name in team_names:
-        champ_count = advancement.get(team_name, [0]*6)[5]
-        p_hat = champ_count / n_sims
-        z = 1.96  # 95% CI
+    for team, count in champ_counts.items():
+        p = count / n_sims
+        z = 1.96
+        n = n_sims
+        denom = 1 + z ** 2 / n
+        center = (p + z ** 2 / (2 * n)) / denom
+        spread = z * math.sqrt((p * (1 - p) + z ** 2 / (4 * n)) / n) / denom
+        confidence[team] = (max(0, center - spread), min(1, center + spread))
 
-        if n_sims > 0:
-            denom = 1 + z**2 / n_sims
-            center = (p_hat + z**2 / (2 * n_sims)) / denom
-            spread = z * math.sqrt((p_hat * (1 - p_hat) + z**2 / (4 * n_sims)) / n_sims) / denom
-            lower = max(0, center - spread)
-            upper = min(1, center + spread)
-        else:
-            lower, upper = 0, 0
+    # Add CI columns
+    results_df["CI_Lower"] = results_df["Team"].apply(
+        lambda t: confidence.get(t, (0, 0))[0])
+    results_df["CI_Upper"] = results_df["Team"].apply(
+        lambda t: confidence.get(t, (0, 0))[1])
 
-        confidence[team_name] = (round(lower, 4), round(upper, 4))
+    return {"results": results_df, "confidence": confidence}
 
-    df_result["CI_Lower"] = df_result["Team"].map(lambda t: confidence.get(t, (0,0))[0])
-    df_result["CI_Upper"] = df_result["Team"].map(lambda t: confidence.get(t, (0,0))[1])
 
-    df_result = df_result.sort_values("ChampionshipProb", ascending=False)
-
-    return {
-        "results": df_result,
-        "advancement": advancement,
-        "confidence": confidence,
-        "n_sims": n_sims,
-    }
+# Need pandas for DataFrame
+import pandas as pd
