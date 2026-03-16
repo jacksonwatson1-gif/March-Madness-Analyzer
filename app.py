@@ -52,7 +52,7 @@ if "model_info" not in st.session_state:
 
 # ── Load Data ──────────────────────────────────────────────────────────────────
 with st.spinner("Loading bracket data..."):
-    df_bracket, data_mode = build_full_dataset(year=2025)
+    df_bracket, data_mode = build_full_dataset(year=2026)
 
 # Ensure all required columns
 for col, default in [
@@ -145,7 +145,7 @@ st.markdown("---")
 k1, k2, k3, k4, k5 = st.columns(5)
 for col, (val, label) in zip([k1, k2, k3, k4, k5], [
     ("68", "Field Size"), ("4", "Regions"), ("63", "Games"),
-    (str(len(df_filtered)), "Filtered"), ("2025", "Season"),
+    (str(len(df_filtered)), "Filtered"), ("2026", "Season"),
 ]):
     with col:
         st.markdown(metric_card(val, label), unsafe_allow_html=True)
@@ -217,7 +217,7 @@ with tab_bracket:
                     color:#FFD166;letter-spacing:5px;">LIVE BRACKET TRACKER</div>
         <div style="font-family:'IBM Plex Mono',monospace;font-size:0.68rem;
                     color:#aaa;letter-spacing:3px;margin-top:8px;">
-            2025 NCAA Division I Men's Basketball Tournament</div>
+            2026 NCAA Division I Men's Basketball Tournament</div>
     </div>""", unsafe_allow_html=True)
 
     # Build bracket state
