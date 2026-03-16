@@ -1,123 +1,63 @@
 """
-config.py — Constants, historical data, scoring systems, and team name aliases.
+config.py — March Madness Analyzer v3 (2026 Tournament)
+========================================================
+Central configuration for regions, scoring, seed history, and constants.
 """
 
-REGIONS = ["East", "West", "South", "Midwest"]
+# ── Region names (official 2026 NCAA Tournament) ──
+REGIONS = ["East", "West", "Midwest", "South"]
 
-ROUNDS = [
-    "Round of 64", "Round of 32", "Sweet 16",
-    "Elite Eight", "Final Four", "Championship",
-]
+ROUNDS = ["R64", "R32", "S16", "E8", "F4", "Champ"]
 
-ROUND_POINTS = {
-    # ESPN Tournament Challenge scoring
-    "espn":   [10, 20, 40, 80, 160, 320],
-    # Standard progressive
-    "standard": [1, 2, 4, 8, 16, 32],
-    # Upset bonus (seed x round multiplier)
-    "upset_bonus": [1, 2, 4, 8, 16, 32],
-}
-
+# ── Conferences represented in the 2026 field ──
 CONFERENCES = [
-    "ACC", "Big Ten", "Big 12", "SEC", "Big East",
-    "Pac-12", "American", "Mountain West", "WCC", "A-10",
-    "Missouri Valley", "CAA", "WAC", "Horizon", "MAAC",
-    "Big Sky", "Southland", "Sun Belt", "CUSA", "Ivy",
-    "Patriot", "Summit", "Big South", "Atlantic Sun",
-    "Ohio Valley", "NEC", "MEAC", "SWAC", "America East",
+    "SEC", "Big Ten", "ACC", "Big 12", "Big East", "WCC",
+    "American", "A-10", "MVC", "MAC", "MWC",
+    "Big South", "Southland", "WAC", "Big West", "CAA",
+    "Sun Belt", "Summit", "CUSA", "Horizon", "Ivy",
+    "SoCon", "ASUN", "OVC", "Big Sky", "MAAC",
+    "NEC", "America East", "MEAC", "SWAC", "Patriot",
 ]
 
-# Historical first-round upset rates (1985-2024, ~40 tournaments)
-HISTORICAL_UPSET_RATES = {
-    (1, 16): 0.013,
-    (2, 15): 0.063,
-    (3, 14): 0.152,
-    (4, 13): 0.202,
-    (5, 12): 0.359,
-    (6, 11): 0.370,
-    (7, 10): 0.392,
-    (8,  9): 0.489,
-}
-
-# Historical win rates by seed advancing through each round (1985-2024)
-SEED_ROUND_WIN_RATES = {
-    1:  [0.993, 0.874, 0.650, 0.500, 0.380, 0.280],
-    2:  [0.937, 0.680, 0.480, 0.310, 0.200, 0.130],
-    3:  [0.848, 0.540, 0.340, 0.190, 0.100, 0.055],
-    4:  [0.798, 0.436, 0.260, 0.140, 0.065, 0.035],
-    5:  [0.641, 0.318, 0.170, 0.075, 0.035, 0.015],
-    6:  [0.630, 0.296, 0.145, 0.060, 0.025, 0.012],
-    7:  [0.608, 0.280, 0.120, 0.045, 0.018, 0.008],
-    8:  [0.511, 0.240, 0.095, 0.035, 0.012, 0.005],
-    9:  [0.489, 0.165, 0.065, 0.020, 0.008, 0.003],
-    10: [0.392, 0.155, 0.060, 0.018, 0.006, 0.002],
-    11: [0.370, 0.163, 0.068, 0.022, 0.008, 0.003],
-    12: [0.359, 0.152, 0.040, 0.012, 0.004, 0.001],
-    13: [0.202, 0.074, 0.015, 0.003, 0.001, 0.000],
-    14: [0.152, 0.063, 0.012, 0.002, 0.000, 0.000],
-    15: [0.063, 0.027, 0.008, 0.002, 0.001, 0.000],
-    16: [0.013, 0.006, 0.002, 0.000, 0.000, 0.000],
-}
-
-# Round-of-64 bracket pairing order (matches standard NCAA bracket tree)
+# ── Standard 1–16 first-round matchup seeds ──
 BRACKET_MATCHUP_SEEDS = [
     (1, 16), (8, 9), (5, 12), (4, 13),
     (6, 11), (3, 14), (7, 10), (2, 15),
 ]
 
-# Team Name Normalization Aliases
-# Maps common ESPN / AP / media names to Barttorvik canonical names.
-TEAM_ALIASES = {
-    "UConn":                   "Connecticut",
-    "UCONN":                   "Connecticut",
-    "Connecticut Huskies":     "Connecticut",
-    "Pitt":                    "Pittsburgh",
-    "Ole Miss":                "Mississippi",
-    "SMU":                     "Southern Methodist",
-    "USC":                     "Southern California",
-    "UCF":                     "Central Florida",
-    "UNC":                     "North Carolina",
-    "UNLV":                    "Nevada Las Vegas",
-    "VCU":                     "Virginia Commonwealth",
-    "BYU":                     "Brigham Young",
-    "LSU":                     "Louisiana State",
-    "TCU":                     "Texas Christian",
-    "UAB":                     "Alabama Birmingham",
-    "UTEP":                    "Texas El Paso",
-    "UMBC":                    "Maryland Baltimore County",
-    "FDU":                     "Fairleigh Dickinson",
-    "FGCU":                    "Florida Gulf Coast",
-    "LIU":                     "Long Island University",
-    "SIU":                     "Southern Illinois",
-    "NIU":                     "Northern Illinois",
-    "SIUE":                    "SIU Edwardsville",
-    "UMass":                   "Massachusetts",
-    "UNI":                     "Northern Iowa",
-    "ETSU":                    "East Tennessee St.",
-    "MTSU":                    "Middle Tennessee",
-    "Mid. Tennessee":          "Middle Tennessee",
-    "Middle Tennessee State":  "Middle Tennessee",
-    "St. Mary's":              "Saint Mary's",
-    "St. Mary's (CA)":         "Saint Mary's",
-    "St. John's":              "Saint John's",
-    "St. Peter's":             "Saint Peter's",
-    "St. Bonaventure":         "Saint Bonaventure",
-    "St. Joseph's":            "Saint Joseph's",
-    "NC State":                "North Carolina St.",
-    "Miami (FL)":              "Miami FL",
-    "Miami":                   "Miami FL",
-    "Loyola Chicago":          "Loyola-Chicago",
-    "Loyola (MD)":             "Loyola MD",
-    "Texas A&M":               "Texas A&M",
+# ── Historical upset rates by seed pairing (1985–2025 data) ──
+HISTORICAL_UPSET_RATES = {
+    (1, 16): 0.013, (2, 15): 0.063, (3, 14): 0.152, (4, 13): 0.202,
+    (5, 12): 0.359, (6, 11): 0.370, (7, 10): 0.392, (8, 9): 0.489,
+    (1, 8):  0.126, (1, 9):  0.126, (2, 7):  0.180, (2, 10): 0.180,
+    (3, 6):  0.270, (3, 11): 0.270, (4, 5):  0.340, (4, 12): 0.340,
 }
 
-# Abbreviation expansions for normalization
-NAME_EXPANSIONS = {
-    "St.":    "Saint",
-    "Univ.":  "University",
-    "N.":     "North",
-    "S.":     "South",
-    "E.":     "East",
-    "W.":     "West",
-    "C.":     "Central",
+# ── Scoring systems for pool play ──
+ROUND_POINTS = {
+    "standard":   {"R64": 1, "R32": 2, "S16": 4,  "E8": 8,  "F4": 16, "Champ": 32},
+    "espn":       {"R64": 10, "R32": 20, "S16": 40, "E8": 80, "F4": 160, "Champ": 320},
+    "cbs":        {"R64": 1, "R32": 2, "S16": 4,  "E8": 8,  "F4": 16, "Champ": 32},
+    "upset_bonus":{"R64": 1, "R32": 2, "S16": 4,  "E8": 8,  "F4": 16, "Champ": 32},
+    "seed_bonus": {"R64": 1, "R32": 2, "S16": 4,  "E8": 8,  "F4": 16, "Champ": 32},
+}
+
+# ── Historical seed win rates by round (1985–2025) ──
+SEED_ROUND_WIN_RATES = {
+    1:  {"R64": 0.993, "R32": 0.874, "S16": 0.700, "E8": 0.550, "F4": 0.400, "Champ": 0.250},
+    2:  {"R64": 0.937, "R32": 0.680, "S16": 0.500, "E8": 0.350, "F4": 0.220, "Champ": 0.130},
+    3:  {"R64": 0.848, "R32": 0.540, "S16": 0.360, "E8": 0.220, "F4": 0.130, "Champ": 0.060},
+    4:  {"R64": 0.798, "R32": 0.436, "S16": 0.260, "E8": 0.150, "F4": 0.080, "Champ": 0.040},
+    5:  {"R64": 0.641, "R32": 0.318, "S16": 0.180, "E8": 0.090, "F4": 0.045, "Champ": 0.020},
+    6:  {"R64": 0.630, "R32": 0.296, "S16": 0.160, "E8": 0.080, "F4": 0.035, "Champ": 0.015},
+    7:  {"R64": 0.608, "R32": 0.280, "S16": 0.140, "E8": 0.060, "F4": 0.025, "Champ": 0.008},
+    8:  {"R64": 0.511, "R32": 0.240, "S16": 0.100, "E8": 0.040, "F4": 0.015, "Champ": 0.005},
+    9:  {"R64": 0.489, "R32": 0.165, "S16": 0.065, "E8": 0.025, "F4": 0.010, "Champ": 0.003},
+    10: {"R64": 0.392, "R32": 0.155, "S16": 0.060, "E8": 0.020, "F4": 0.008, "Champ": 0.002},
+    11: {"R64": 0.370, "R32": 0.163, "S16": 0.065, "E8": 0.025, "F4": 0.010, "Champ": 0.003},
+    12: {"R64": 0.359, "R32": 0.152, "S16": 0.055, "E8": 0.018, "F4": 0.006, "Champ": 0.001},
+    13: {"R64": 0.202, "R32": 0.074, "S16": 0.020, "E8": 0.005, "F4": 0.001, "Champ": 0.0003},
+    14: {"R64": 0.152, "R32": 0.063, "S16": 0.015, "E8": 0.003, "F4": 0.001, "Champ": 0.0001},
+    15: {"R64": 0.063, "R32": 0.027, "S16": 0.005, "E8": 0.001, "F4": 0.0002, "Champ": 0.00005},
+    16: {"R64": 0.013, "R32": 0.006, "S16": 0.001, "E8": 0.0002, "F4": 0.00003, "Champ": 0.000005},
 }
