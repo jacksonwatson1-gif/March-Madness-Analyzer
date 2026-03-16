@@ -1,223 +1,180 @@
 """
-ui/components.py — Reusable HTML card builders and bracket visualization helpers.
+components.py — March Madness Analyzer v3
+==========================================
+Reusable HTML/Streamlit component helpers.
 """
 
-import streamlit as st
-import pandas as pd
 
-
-def metric_card(value: str, label: str, size: str = "2.4rem") -> str:
+def metric_card(value, label, font_size="2.2rem"):
+    """Render a styled metric card."""
     return f"""
     <div class='metric-card'>
-        <div class='metric-value' style='font-size:{size};'>{value}</div>
-        <div class='metric-label'>{label}</div>
+        <div class='value' style='font-size:{font_size};'>{value}</div>
+        <div class='label'>{label}</div>
     </div>"""
 
 
-def win_prob_color(prob: float) -> tuple:
-    if prob >= 0.75:
-        return ("#0a5c2e", "#06D6A0", "@@@@")
-    elif prob >= 0.55:
-        return ("#1a472a", "#4ade80", "@@@o")
-    elif prob >= 0.45:
-        return ("#3d2e00", "#FFD166", "@@oo")
-    elif prob >= 0.25:
-        return ("#5c1a1a", "#f87171", "@@oo")
+def style_df(df, fmt=None):
+    """Apply formatting to a DataFrame for display."""
+    if fmt:
+        styled = df.style.format(fmt, na_rep="—")
     else:
-        return ("#6b0f0f", "#EF476F", "@ooo")
+        styled = df.style
+    return styled
 
 
-def team_slot_html(
-    team_row, prob: float,
-    is_winner: bool = False,
-    is_eliminated: bool = False,
-) -> str:
-    bg, fg, dots = win_prob_color(prob)
-    name = str(team_row.get("Team", "TBD"))
-    seed = int(team_row.get("Seed", 0))
-    pct_str = f"{prob*100:.0f}%"
+def win_prob_color(prob):
+    """Return hex color based on win probability."""
+    if prob >= 0.75:
+        return "#06D6A0"
+    elif prob >= 0.55:
+        return "#FFD166"
+    elif prob >= 0.40:
+        return "#FF6B35"
+    else:
+        return "#EF476F"
 
-    if is_winner:
-        bg, fg = "#0a3d1f", "#06D6A0"
-    if is_eliminated:
-        bg, fg = "#1a0a0a", "#555"
 
-    adv_icon = "ADV" if is_winner else ("ELIM" if is_eliminated else "")
-    adv_style = "color:#06D6A0;" if is_winner else "color:#666;"
+def team_slot_html(row, prob=None, is_fav=True):
+    """Render a team slot in bracket view."""
+    seed = int(row.get("Seed", 0))
+    team = str(row.get("Team", ""))
+    css_class = "fav" if is_fav else "dog"
+    prob_html = ""
+    if prob is not None:
+        color = win_prob_color(prob)
+        prob_html = f"<span style='color:{color};font-weight:600;'>{prob*100:.0f}%</span>"
 
     return f"""
-    <div style="
-        background:{bg};
-        border-left: 3px solid {fg};
-        border-radius: 3px;
-        padding: 5px 8px;
-        margin: 2px 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-height: 36px;
-        font-family: 'IBM Plex Mono', monospace;
-    ">
-        <div style="display:flex;align-items:center;gap:6px;">
-            <span style="color:{fg};font-size:0.65rem;font-weight:700;
-                         min-width:18px;text-align:center;">{seed}</span>
-            <span style="color:#e0e0e0;font-size:0.72rem;font-weight:500;
-                         white-space:nowrap;overflow:hidden;max-width:120px;
-                         text-overflow:ellipsis;" title="{name}">{name}</span>
-        </div>
-        <div style="display:flex;align-items:center;gap:5px;">
-            <span style="font-size:0.65rem;{adv_style}font-weight:700;">{adv_icon}</span>
-            <span style="
-                background:{fg}22;
-                color:{fg};
-                font-size:0.65rem;
-                font-weight:700;
-                padding:2px 5px;
-                border-radius:2px;
-                letter-spacing:1px;
-            ">{pct_str}</span>
-        </div>
+    <div class='team-slot {css_class}'>
+        <span>({seed}) {team}</span>
+        {prob_html}
     </div>"""
 
 
-def matchup_html(matchup: dict) -> str:
-    fav = matchup["fav"]
-    dog = matchup["dog"]
-    fp = matchup["fav_prob"]
-    dp = matchup["dog_prob"]
+def matchup_html(matchup):
+    """Render a matchup probability card."""
+    fav = matchup.get("fav", {})
+    dog = matchup.get("dog", {})
+    fav_prob = matchup.get("fav_prob", 0.5)
+    dog_prob = matchup.get("dog_prob", 0.5)
     winner = matchup.get("winner")
 
-    fav_won = winner == str(fav.get("Team", ""))
-    dog_won = winner == str(dog.get("Team", ""))
+    fav_name = str(fav.get("Team", "Team A"))
+    dog_name = str(dog.get("Team", "Team B"))
+    fav_seed = int(fav.get("Seed", 1))
+    dog_seed = int(dog.get("Seed", 16))
 
-    slot1 = team_slot_html(fav, fp, is_winner=fav_won, is_eliminated=dog_won)
-    slot2 = team_slot_html(dog, dp, is_winner=dog_won, is_eliminated=fav_won)
+    fav_color = win_prob_color(fav_prob)
+    dog_color = win_prob_color(dog_prob)
+
+    winner_marker_fav = " ✓" if winner == fav_name else ""
+    winner_marker_dog = " ✓" if winner == dog_name else ""
+
+    fav_bg = "#06D6A015" if winner == fav_name else "transparent"
+    dog_bg = "#FF6B3515" if winner == dog_name else "transparent"
 
     return f"""
-    <div style="
-        background:#0a1628;
-        border:1px solid #1e3a5f;
-        border-radius:4px;
-        padding:6px;
-        margin-bottom:8px;
-    ">
-        {slot1}
-        <div style="height:1px;background:#1e3a5f;margin:2px 0;"></div>
-        {slot2}
+    <div class='matchup-card'>
+        <div style='display:flex;justify-content:space-between;align-items:center;
+                    padding:3px 0;background:{fav_bg};border-radius:3px;'>
+            <span style='font-family:IBM Plex Mono,monospace;font-size:0.72rem;color:#ddd;'>
+                ({fav_seed}) {fav_name}{winner_marker_fav}
+            </span>
+            <span style='font-family:IBM Plex Mono,monospace;font-size:0.72rem;
+                         color:{fav_color};font-weight:600;'>
+                {fav_prob*100:.1f}%
+            </span>
+        </div>
+        <div style='display:flex;justify-content:space-between;align-items:center;
+                    padding:3px 0;background:{dog_bg};border-radius:3px;'>
+            <span style='font-family:IBM Plex Mono,monospace;font-size:0.72rem;color:#ddd;'>
+                ({dog_seed}) {dog_name}{winner_marker_dog}
+            </span>
+            <span style='font-family:IBM Plex Mono,monospace;font-size:0.72rem;
+                         color:{dog_color};font-weight:600;'>
+                {dog_prob*100:.1f}%
+            </span>
+        </div>
     </div>"""
 
 
-def region_bracket_html(region: str, matchups: list) -> str:
-    cards = "".join(matchup_html(m) for m in matchups)
+def region_bracket_html(region, matchups):
+    """Render a mini region bracket visualization."""
+    games_html = ""
+    for m in matchups:
+        fav = m.get("fav", {})
+        dog = m.get("dog", {})
+        fav_seed = int(fav.get("Seed", 0))
+        dog_seed = int(dog.get("Seed", 0))
+        fav_name = str(fav.get("Team", ""))[:14]
+        dog_name = str(dog.get("Team", ""))[:14]
+        fav_prob = m.get("fav_prob", 0.5)
+        dog_prob = m.get("dog_prob", 0.5)
+        winner = m.get("winner")
+
+        fav_w = "font-weight:700;color:#06D6A0;" if winner == str(fav.get("Team", "")) else ""
+        dog_w = "font-weight:700;color:#FF6B35;" if winner == str(dog.get("Team", "")) else ""
+
+        games_html += f"""
+        <div style='margin:3px 0;padding:4px 6px;background:#07142955;border-radius:3px;
+                    font-family:IBM Plex Mono,monospace;font-size:0.58rem;'>
+            <div style='{fav_w}'>({fav_seed}) {fav_name} <span style='float:right;'>{fav_prob*100:.0f}%</span></div>
+            <div style='{dog_w}'>({dog_seed}) {dog_name} <span style='float:right;'>{dog_prob*100:.0f}%</span></div>
+        </div>"""
+
     return f"""
-    <div style="flex:1;min-width:260px;">
-        <div style="
-            font-family:'Bebas Neue',sans-serif;
-            font-size:1.2rem;
-            color:#FF6B35;
-            letter-spacing:3px;
-            padding:4px 0 8px 0;
-            border-bottom:2px solid #FF6B35;
-            margin-bottom:10px;
-        ">{region.upper()}</div>
-        {cards}
+    <div class='region-bracket'>
+        <div class='region-title'>{region.upper()}</div>
+        {games_html}
     </div>"""
 
 
 def render_color_legend():
-    entries = [
-        ("G", "#06D6A0", ">= 75%",   "Heavy Fav"),
-        ("g", "#4ade80", "55-74%",  "Mod. Fav"),
-        ("Y", "#FFD166", "45-54%",  "Toss-Up"),
-        ("r", "#f87171", "25-44%",  "Mod. Dog"),
-        ("R", "#EF476F", "< 25%",   "Heavy Dog"),
-    ]
-    st.markdown("**WIN PROBABILITY COLOR KEY**")
-    cols = st.columns(5)
-    for col, (icon, color, pct, label) in zip(cols, entries):
-        with col:
-            st.markdown(
-                f"<div style='background:{color}22;border-left:4px solid {color};"
-                f"border-radius:3px;padding:8px 10px;text-align:center;'>"
-                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.7rem;"
-                f"color:{color};font-weight:700;'>{pct}</div>"
-                f"<div style='font-family:IBM Plex Mono,monospace;font-size:0.62rem;"
-                f"color:#aaa;margin-top:2px;'>{label}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
+    """Render the win probability color legend."""
+    import streamlit as st
+    st.markdown("""
+    <div class='color-legend'>
+        <span><span class='dot' style='background:#06D6A0;'></span> ≥75% (Strong)</span>
+        <span><span class='dot' style='background:#FFD166;'></span> 55–75% (Lean)</span>
+        <span><span class='dot' style='background:#FF6B35;'></span> 40–55% (Toss-up)</span>
+        <span><span class='dot' style='background:#EF476F;'></span> <40% (Upset Risk)</span>
+    </div>""", unsafe_allow_html=True)
 
 
-def style_df(df: pd.DataFrame, fmt: dict = None):
-    display_df = df.copy()
+def team_card_html(row, role="FAV"):
+    """Render a detailed team card for upset analysis."""
+    team = str(row.get("Team", ""))
+    seed = int(row.get("Seed", 0))
+    region = str(row.get("Region", ""))
+    conf = str(row.get("Conference", ""))
+    record = str(row.get("Record", ""))
+    adj_oe = float(row.get("AdjOE", 100))
+    adj_de = float(row.get("AdjDE", 100))
+    adj_em = float(row.get("AdjEM", 0))
+    tempo = float(row.get("Tempo", 68))
+    cont = float(row.get("Continuity", 70))
+    sos = float(row.get("SOS", 0.50))
+    tov = float(row.get("TOV%", 16))
 
-    for col in ["Win Prob", "Win%", "ChampionshipProb", "Champ_Prob",
-                "R64_Prob", "R32_Prob", "S16_Prob", "E8_Prob", "F4_Prob"]:
-        if col in display_df.columns:
-            display_df[col] = pd.to_numeric(
-                display_df[col].astype(str).str.replace('%', ''), errors='coerce'
-            )
-
-    styled = display_df.style
-
-    for col in ["Win Prob", "Win%", "ChampionshipProb", "Champ_Prob", "WinProb"]:
-        if col in display_df.columns:
-            styled = styled.background_gradient(subset=[col], cmap='RdYlGn', vmin=0, vmax=1)
-
-    styled = styled.set_table_styles([
-        {'selector': 'th', 'props': [
-            ('background-color', '#FFD166'),
-            ('color', '#0B1F3A'),
-            ('font-weight', 'bold'),
-        ]}
-    ])
-
-    if fmt:
-        styled = styled.format(fmt, na_rep="--")
-
-    return styled
-
-
-def team_card_html(data, label: str) -> str:
-    adjoe = float(data.get("AdjOE", 0))
-    adjde = float(data.get("AdjDE", 0))
-    adjem = float(data.get("AdjEM", 0))
-    cont = float(data.get("Continuity", 70))
-    tempo = float(data.get("Tempo", 68))
-    tov = float(data.get("TOV%", 16))
+    border_color = "#06D6A0" if role == "FAV" else "#FF6B35"
+    role_label = "FAVORITE" if role == "FAV" else "UNDERDOG"
 
     return f"""
-    <div class='metric-card'>
-    <div class='metric-label'>{label} | Seed: {data['Seed']} | Region: {data.get('Region','?')}</div>
-    <div style='font-size:0.85rem;color:#aaa;margin-bottom:0.8rem;'>
-        {data.get('Conference','?')}
-    </div>
-    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;'>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#06D6A0;'>{adjoe:.1f}</div>
-            <div class='metric-label'>AdjOE</div>
+    <div class='team-card' style='border-color:{border_color};'>
+        <div style='font-family:IBM Plex Mono,monospace;font-size:0.6rem;
+                    color:{border_color};letter-spacing:2px;'>{role_label}</div>
+        <div class='team-name'>{team}</div>
+        <div class='team-meta'>
+            ({seed}) Seed · {region} · {conf} · {record}
         </div>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#EF476F;'>{adjde:.1f}</div>
-            <div class='metric-label'>AdjDE</div>
+        <div class='stat-row'>
+            <div class='stat-item'>AdjOE <span class='stat-val'>{adj_oe:.1f}</span></div>
+            <div class='stat-item'>AdjDE <span class='stat-val'>{adj_de:.1f}</span></div>
+            <div class='stat-item'>AdjEM <span class='stat-val'>{adj_em:+.1f}</span></div>
+            <div class='stat-item'>Tempo <span class='stat-val'>{tempo:.1f}</span></div>
+            <div class='stat-item'>Cont <span class='stat-val'>{cont:.0f}%</span></div>
+            <div class='stat-item'>SOS <span class='stat-val'>{sos:.3f}</span></div>
+            <div class='stat-item'>TOV% <span class='stat-val'>{tov:.1f}</span></div>
         </div>
-        <div>
-            <div class='metric-value' style='font-size:1.3rem;color:#FFD166;'>{adjem:+.1f}</div>
-            <div class='metric-label'>AdjEM</div>
-        </div>
-    </div>
-    <div style='display:grid;grid-template-columns:repeat(3,1fr);gap:0.5rem;margin-top:0.5rem;'>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#aaa;'>{cont:.0f}%</div>
-            <div class='metric-label'>Continuity</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#60a5fa;'>{tempo:.1f}</div>
-            <div class='metric-label'>Tempo</div>
-        </div>
-        <div>
-            <div class='metric-value' style='font-size:1.1rem;color:#c084fc;'>{tov:.1f}</div>
-            <div class='metric-label'>TOV%</div>
-        </div>
-    </div>
     </div>"""
