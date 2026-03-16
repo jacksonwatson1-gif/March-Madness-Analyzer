@@ -113,21 +113,27 @@ def region_bracket_html(region, matchups):
         dog_prob = m.get("dog_prob", 0.5)
         winner = m.get("winner")
 
-        fav_w = "font-weight:700;color:#06D6A0;" if winner == str(fav.get("Team", "")) else ""
-        dog_w = "font-weight:700;color:#FF6B35;" if winner == str(dog.get("Team", "")) else ""
+        fav_color = win_prob_color(fav_prob)
+        dog_color = win_prob_color(dog_prob)
+        fav_w = "font-weight:700;color:#06D6A0;" if winner == str(fav.get("Team", "")) else "color:#ddd;"
+        dog_w = "font-weight:700;color:#FF6B35;" if winner == str(dog.get("Team", "")) else "color:#aaa;"
 
-        games_html += f"""
-        <div style='margin:3px 0;padding:4px 6px;background:#07142955;border-radius:3px;
-                    font-family:IBM Plex Mono,monospace;font-size:0.58rem;'>
-            <div style='{fav_w}'>({fav_seed}) {fav_name} <span style='float:right;'>{fav_prob*100:.0f}%</span></div>
-            <div style='{dog_w}'>({dog_seed}) {dog_name} <span style='float:right;'>{dog_prob*100:.0f}%</span></div>
-        </div>"""
+        games_html += (
+            '<div style="margin:3px 0;padding:4px 6px;background:#07142955;border-radius:3px;'
+            'font-family:IBM Plex Mono,monospace;font-size:0.58rem;">'
+            f'<div style="{fav_w}">({fav_seed}) {fav_name} '
+            f'<span style="float:right;color:{fav_color};font-weight:600;">{fav_prob*100:.0f}%</span></div>'
+            f'<div style="{dog_w}">({dog_seed}) {dog_name} '
+            f'<span style="float:right;color:{dog_color};font-weight:600;">{dog_prob*100:.0f}%</span></div>'
+            '</div>'
+        )
 
-    return f"""
-    <div class='region-bracket'>
-        <div class='region-title'>{region.upper()}</div>
-        {games_html}
-    </div>"""
+    return (
+        '<div class="region-bracket">'
+        f'<div class="region-title">{region.upper()}</div>'
+        f'{games_html}'
+        '</div>'
+    )
 
 
 def render_color_legend():
