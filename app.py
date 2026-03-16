@@ -7,6 +7,7 @@ EV-optimized bracket generation, and Monte Carlo simulation.
 
 Architecture: Modular (config, data/, models/, ui/)
 Model: Fitted logistic regression with 9 features (no collinearity)
+Updated: 2026 NCAA Tournament — Selection Sunday March 15, 2026
 """
 
 import streamlit as st
@@ -36,7 +37,7 @@ from components import (
 
 # ── Page Config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="March Madness Analyzer v3",
+    page_title="March Madness Analyzer v3 — 2026",
     page_icon="🏀",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -51,7 +52,7 @@ if "model_info" not in st.session_state:
 
 
 # ── Load Data ──────────────────────────────────────────────────────────────────
-with st.spinner("Loading bracket data..."):
+with st.spinner("Loading 2026 bracket data..."):
     df_bracket, data_mode = build_full_dataset(year=2026)
 
 # Ensure all required columns
@@ -65,7 +66,8 @@ for col, default in [
         df_bracket[col] = default
 
 # KenPom rank (ordinal rank of AdjEM)
-df_bracket["KenPom"] = df_bracket["AdjEM"].rank(ascending=False).astype(int)
+if "KenPom" not in df_bracket.columns:
+    df_bracket["KenPom"] = df_bracket["AdjEM"].rank(ascending=False).astype(int)
 
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
@@ -128,7 +130,7 @@ col_title, col_date = st.columns([5, 1])
 with col_title:
     st.markdown("<div class='main-title'>MARCH MADNESS<br>ANALYZER</div>",
                 unsafe_allow_html=True)
-    st.markdown("<div class='subtitle'>● NCAA Tournament Intelligence Platform · v3 ●</div>",
+    st.markdown("<div class='subtitle'>● NCAA Tournament Intelligence Platform · v3 · 2026 ●</div>",
                 unsafe_allow_html=True)
 with col_date:
     mode_color = "#06D6A0" if data_mode == "LIVE" else "#FF6B35"
@@ -381,7 +383,7 @@ with tab_picker:
                         st.rerun()
 
 
-# ─── Tab 4: EV Optimizer (NEW) ────────────────────────────────────────────────
+# ─── Tab 4: EV Optimizer ──────────────────────────────────────────────────────
 with tab_ev:
     st.markdown("""
     <div style="background:linear-gradient(135deg,#0d1f3c,#1a3a6b);
@@ -597,12 +599,12 @@ with tab_upset:
 
 # ─── Tab 7: Seed History ───────────────────────────────────────────────────────
 with tab_hist:
-    st.markdown("### HISTORICAL SEED PERFORMANCE (1985 – 2024)")
+    st.markdown("### HISTORICAL SEED PERFORMANCE (1985 – 2025)")
 
     seed_data = {
         "Seed": list(range(1, 17)),
-        "FF_Apps": [140, 48, 32, 22, 18, 14, 12, 12, 3, 5, 8, 9, 1, 1, 0, 1],
-        "Titles":  [37, 18, 7, 5, 3, 2, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
+        "FF_Apps": [144, 48, 32, 22, 18, 14, 12, 12, 3, 5, 8, 9, 1, 1, 0, 1],
+        "Titles":  [41, 18, 7, 5, 3, 2, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0],
         "R32_Rate": [0.993, 0.937, 0.848, 0.798, 0.641, 0.630, 0.608, 0.511,
                      0.489, 0.392, 0.370, 0.359, 0.202, 0.152, 0.063, 0.013],
         "S16_Rate": [0.874, 0.680, 0.540, 0.436, 0.318, 0.296, 0.280, 0.240,
@@ -626,6 +628,7 @@ with tab_hist:
 
     st.markdown("#### Notable Historical Upsets")
     notable = pd.DataFrame([
+        {"Year": 2025, "Matchup": "(1) All Four #1 Seeds → Final Four",  "Winner": "Florida (champ)", "Gap": "—"},
         {"Year": 2023, "Matchup": "(1) Purdue vs (16) FDU",              "Winner": "FDU",              "Gap": 15},
         {"Year": 2018, "Matchup": "(1) Virginia vs (16) UMBC",           "Winner": "UMBC",             "Gap": 15},
         {"Year": 2023, "Matchup": "(2) Arizona vs (15) Princeton",       "Winner": "Princeton",        "Gap": 13},
@@ -701,7 +704,7 @@ with tab_mc:
         st.info("Configure simulations in the sidebar and press **▶ RUN SIMULATION**.")
 
 
-# ─── Tab 9: Model Dashboard (NEW) ─────────────────────────────────────────────
+# ─── Tab 9: Model Dashboard ───────────────────────────────────────────────────
 with tab_model:
     st.markdown("### MODEL TRANSPARENCY DASHBOARD")
 
@@ -758,7 +761,7 @@ st.markdown("---")
 st.markdown(f"""
 <div style='text-align:center;font-family:IBM Plex Mono,monospace;
             font-size:0.6rem;color:#444;letter-spacing:2px;padding:1rem 0;'>
-MARCH MADNESS ANALYZER v3 · {data_mode} DATA ·
+MARCH MADNESS ANALYZER v3 · {data_mode} DATA · 2026 NCAA TOURNAMENT ·
 9-FEATURE LOGISTIC MODEL {'(FITTED)' if info.get('fitted') else '(DEFAULT)'} ·
 BARTTORVIK + ESPN · NOT FOR WAGERING PURPOSES
 </div>""", unsafe_allow_html=True)
