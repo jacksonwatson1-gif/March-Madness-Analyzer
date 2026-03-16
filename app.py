@@ -294,13 +294,38 @@ with tab_bracket:
     all_html = "".join(
         region_bracket_html(r, bracket_state.get(r, [])) for r in REGIONS
     )
-    st.markdown(f"""
+    import streamlit.components.v1 as stc
+    bracket_full_html = f"""
+    <html><body style="margin:0;padding:0;background:transparent;">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
+        .region-bracket {{
+            flex: 1;
+            min-width: 200px;
+            background: #0d1f3c88;
+            border: 1px solid #FF6B3522;
+            border-radius: 6px;
+            padding: 10px;
+        }}
+        .region-bracket .region-title {{
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 1.1rem;
+            color: #FFD166;
+            letter-spacing: 4px;
+            text-align: center;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #FF6B3533;
+            padding-bottom: 4px;
+        }}
+    </style>
     <div style="display:flex;gap:14px;flex-wrap:wrap;
                 background:linear-gradient(135deg,#071429,#0d1f3c);
                 border:2px solid #FF6B35;border-radius:8px;
                 padding:20px;overflow-x:auto;">
         {all_html}
-    </div>""", unsafe_allow_html=True)
+    </div>
+    </body></html>"""
+    stc.html(bracket_full_html, height=520, scrolling=True)
 
 
 # ─── Tab 3: Bracket Picker ────────────────────────────────────────────────────
