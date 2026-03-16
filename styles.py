@@ -1,146 +1,171 @@
 """
-ui/styles.py — All CSS for the March Madness Analyzer.
+styles.py — March Madness Analyzer v3
+=======================================
+CSS styles for Streamlit interface.
 """
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600&display=swap');
-
-:root {
-    --orange: #FF6B35;
-    --navy:   #0B1F3A;
-    --cream:  #F5F0E8;
-    --gold:   #FFD166;
-    --green:  #06D6A0;
-    --red:    #EF476F;
-    --card:   #0F2847;
-    --purple: #c084fc;
-    --blue:   #60a5fa;
-}
-
-html, body, [class*="css"] {
-    background-color: var(--navy);
-    color: var(--cream);
-    font-family: 'IBM Plex Sans', sans-serif;
-}
-
-h1, h2, h3 { font-family: 'Bebas Neue', sans-serif; letter-spacing: 2px; }
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;500;600&display=swap');
 
 .main-title {
     font-family: 'Bebas Neue', sans-serif;
     font-size: 4rem;
-    color: var(--orange);
-    line-height: 1;
-    letter-spacing: 4px;
-}
-
-.subtitle {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.85rem;
-    color: var(--gold);
-    letter-spacing: 3px;
+    color: #FF6B35;
+    letter-spacing: 12px;
+    line-height: 1.0;
     text-transform: uppercase;
 }
-
-.metric-card {
-    background: var(--card);
-    border: 1px solid var(--orange);
-    border-radius: 4px;
-    padding: 1.2rem;
-    text-align: center;
-    margin: 0.3rem 0;
-}
-
-.metric-value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2.4rem;
-    color: var(--gold);
-}
-
-.metric-label {
+.subtitle {
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    color: var(--orange);
+    font-size: 0.72rem;
+    color: #FFD166;
+    letter-spacing: 5px;
+    margin-top: 4px;
+}
+
+/* Metric cards */
+.metric-card {
+    background: linear-gradient(135deg, #0F2847, #1a3a6b);
+    border: 1px solid #FF6B3555;
+    border-radius: 6px;
+    padding: 0.8rem 1rem;
+    text-align: center;
+}
+.metric-card .value {
+    font-family: 'Bebas Neue', sans-serif;
+    color: #FFD166;
+    letter-spacing: 3px;
+}
+.metric-card .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: #aaa;
     letter-spacing: 2px;
     text-transform: uppercase;
 }
 
-.upset-high   { color: #EF476F; font-weight: 600; }
+/* Badges */
+.badge-live {
+    background: #06D6A0; color: #000; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.65rem; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+}
+.badge-demo {
+    background: #FF6B35; color: #fff; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.65rem; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+}
+.badge-fitted {
+    background: #06D6A0; color: #000; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.65rem; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+}
+.badge-default {
+    background: #FFD166; color: #000; padding: 2px 8px;
+    border-radius: 4px; font-size: 0.65rem; font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Upset severity */
+.upset-high   { color: #EF476F; font-weight: 700; }
 .upset-medium { color: #FFD166; font-weight: 600; }
-.upset-low    { color: #06D6A0; font-weight: 600; }
+.upset-low    { color: #06D6A0; font-weight: 500; }
+.upset-minimal{ color: #aaa;    font-weight: 400; }
 
-.badge-live { background:#06D6A0; color:#000; padding:2px 8px;
-              border-radius:3px; font-size:0.65rem;
-              font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
-.badge-demo { background:#FF6B35; color:#000; padding:2px 8px;
-              border-radius:3px; font-size:0.65rem;
-              font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
+/* Team slots */
+.team-slot {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin: 2px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.team-slot.fav { background: #0F284788; border-left: 3px solid #06D6A0; }
+.team-slot.dog { background: #0F284788; border-left: 3px solid #FF6B35; }
 
-.badge-fitted { background:#06D6A0; color:#000; padding:2px 8px;
-                border-radius:3px; font-size:0.65rem;
-                font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
-.badge-default { background:#FFD166; color:#000; padding:2px 8px;
-                 border-radius:3px; font-size:0.65rem;
-                 font-family:'IBM Plex Mono',monospace; letter-spacing:2px; }
-
-.stSelectbox label, .stSlider label, .stMultiSelect label {
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-size: 0.75rem !important;
-    color: var(--orange) !important;
-    letter-spacing: 2px !important;
-    text-transform: uppercase !important;
+/* Matchup card */
+.matchup-card {
+    background: linear-gradient(135deg, #0d1f3c, #132d54);
+    border: 1px solid #FF6B3533;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin: 6px 0;
 }
 
-div[data-testid="stSidebar"] {
-    background-color: #071429;
-    border-right: 2px solid var(--orange);
+/* Region bracket */
+.region-bracket {
+    flex: 1;
+    min-width: 200px;
+    background: #0d1f3c88;
+    border: 1px solid #FF6B3522;
+    border-radius: 6px;
+    padding: 10px;
 }
-
-.stDataFrame { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
-
-section[data-testid="stSidebar"] h2 {
+.region-bracket .region-title {
     font-family: 'Bebas Neue', sans-serif;
-    color: var(--orange);
+    font-size: 1.1rem;
+    color: #FFD166;
+    letter-spacing: 4px;
+    text-align: center;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #FF6B3533;
+    padding-bottom: 4px;
+}
+
+/* Team card */
+.team-card {
+    background: linear-gradient(135deg, #0d1f3c, #132d54);
+    border: 1px solid #FF6B3544;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin: 8px 0;
+}
+.team-card .team-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: #FFD166;
     letter-spacing: 3px;
 }
-
-button[data-baseweb="tab"] div p {
-    color: #FFD166 !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    font-weight: 600 !important;
-    letter-spacing: 1px !important;
-    transition: all 0.3s ease !important;
+.team-card .team-meta {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: #aaa;
+}
+.team-card .stat-row {
+    display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap;
+}
+.team-card .stat-item {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: #ddd;
+}
+.team-card .stat-item .stat-val {
+    color: #FFD166;
+    font-weight: 600;
 }
 
-button[data-baseweb="tab"]:hover div p {
-    color: #FFFFFF !important;
-    text-shadow: 0 0 10px rgba(255, 209, 102, 0.8) !important;
+/* Color legend */
+.color-legend {
+    display: flex; gap: 16px; font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem; color: #aaa; flex-wrap: wrap;
+}
+.color-legend span {
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.color-legend .dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
 }
 
-button[aria-selected="true"] div p {
-    color: #FF6B35 !important;
-    border-bottom: 2px solid #FF6B35 !important;
+/* Global dark tweaks */
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(180deg, #071429 0%, #0d1f3c 100%) !important;
 }
-
-button[data-baseweb="tab"]:hover {
-    background-color: rgba(255, 209, 102, 0.1) !important;
-}
-
-.stDataFrame th, .stTable th, div[data-testid="stTable"] th {
-    background-color: #FFD166 !important;
-    border: 1px solid #FF6B35 !important;
-}
-
-.stDataFrame th div, .stTable th div, div[data-testid="stTable"] th div {
-    color: #0B1F3A !important;
-    font-weight: 800 !important;
-    font-family: 'IBM Plex Mono', monospace !important;
-    text-transform: uppercase !important;
-    letter-spacing: 1px !important;
-}
-
-.stDataFrame td {
-    color: #F5F0E8 !important;
+[data-testid="stSidebar"] {
+    background: #0a1628 !important;
 }
 </style>
 """
